@@ -2,7 +2,7 @@ const STORAGE_KEY="lidire-mvp-data";
 
 const initialState={
   page:"inicio",
-  user:{name:"Alice",email:"conta@lidire.com",phone:"",age:""},
+  user:{name:"Mirella",email:"conta@lidire.com",phone:"",age:""},
   data:{
     tarefas:[],compromissos:[],compras:[],estudos:[],treinos:[],
     lembretes:[],agua:0,fin:{receitas:[],despesas:[]},objetivos:[],familia:[]
