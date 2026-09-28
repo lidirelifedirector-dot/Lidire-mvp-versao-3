@@ -4847,135 +4847,92 @@ function editItem(type, id) {
   };
 }
 
-/* =========================================================
+/* ================================
    FOTO DE PERFIL
-   ========================================================= */
+   ================================ */
 
-function profilePhoto() {
+.profile-avatar {
+  width: 110px;
+  height: 110px;
+  min-width: 110px;
+  min-height: 110px;
 
-  openModal(
-    "Foto de perfil",
+  margin: 0 auto 14px;
 
-    `
-      ${
-        state.user.photo
-          ? `
-            <div class="photo-preview">
-              <img
-                class="profile-photo-preview"
-                src="${esc(
-                  state.user.photo
-                )}"
-                alt="Foto atual"
-              >
-            </div>
-          `
-          : `
-            <div class="photo-preview">
-              <div class="profile-photo-placeholder">
-                📷
-              </div>
-            </div>
-          `
-      }
+  border-radius: 50%;
+  overflow: hidden;
 
-      <label class="form-field">
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-        <span>
-          Escolher foto
-        </span>
+  background: linear-gradient(135deg, #6d4aff, #9b6cff);
+  border: 3px solid rgba(255, 255, 255, 0.18);
 
-        <input
-          id="profile-photo-input"
-          type="file"
-          accept="image/*"
-        >
+  font-size: 42px;
+  font-weight: 700;
 
-      </label>
+  position: relative;
+}
 
-      <button
-        type="button"
-        class="ghost-button"
-        id="remove-profile-photo"
-      >
-        🗑 Excluir foto atual
-      </button>
-    `,
+.profile-avatar img {
+  display: block;
 
-    {
-      submit: "Salvar foto"
-    }
-  );
+  width: 100%;
+  height: 100%;
 
-  let selectedPhoto =
-    state.user.photo || "";
+  max-width: 100%;
+  max-height: 100%;
 
-  const input =
-    modal.querySelector(
-      "#profile-photo-input"
-    );
+  object-fit: cover;
+  object-position: center;
 
-  input.onchange = event => {
+  border-radius: 50%;
+}
 
-    const file =
-      event.target.files?.[0];
+/* Impede qualquer imagem de perfil de ultrapassar seu container */
+.profile-card img,
+.profile-avatar img {
+  max-width: 100%;
+}
 
-    if (!file) return;
+/* Botão/área da foto */
+.profile-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
 
-    const reader =
-      new FileReader();
+.profile-photo-actions button {
+  border: 0;
+  cursor: pointer;
+}
 
-    reader.onload = () => {
-      selectedPhoto =
-        reader.result;
-    };
+/* Caso a imagem seja exibida em qualquer preview */
+.profile-photo-preview {
+  width: 140px;
+  height: 140px;
 
-    reader.readAsDataURL(file);
-  };
+  border-radius: 50%;
+  overflow: hidden;
 
-  modal.querySelector(
-    "#remove-profile-photo"
-  ).onclick = () => {
+  margin: 0 auto 16px;
 
-    selectedPhoto = "";
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-    state.user.photo = "";
+  background: rgba(255,255,255,.06);
+}
 
-    saveState();
-
-    closeModal();
-    render();
-
-    toast(
-      "Foto de perfil excluída."
-    );
-  };
-
-  modal.querySelector(
-    "#lidire-form"
-  ).onsubmit = e => {
-
-    e.preventDefault();
-
-    if (!selectedPhoto) {
-      toast(
-        "Selecione uma foto.",
-        "error"
-      );
-      return;
-    }
-
-    state.user.photo =
-      selectedPhoto;
-
-    saveState();
-    closeModal();
-    render();
-
-    toast(
-      "Foto de perfil atualizada."
-    );
-  };
+.profile-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 /* =========================================================
