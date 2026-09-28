@@ -1354,3 +1354,699 @@ function listaCompras(id) {
 
   `);
 }
+
+/* =========================================================
+   ESTUDOS
+   ========================================================= */
+
+function estudos() {
+  const items = state.data.estudos || [];
+
+  return appShell(`
+
+    ${pageHeader(
+      "APRENDIZADO",
+      "Estudos",
+      "Acompanhe matérias, assuntos, anotações e bibliografia.",
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-estudos"
+        >
+          ${icon("plus")} Adicionar
+        </button>
+      `
+    )}
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          ${items.length}
+          ${items.length === 1 ? "matéria" : "matérias"}
+        </div>
+
+      </div>
+
+      ${
+        items.length
+          ? `
+            <div class="item-list">
+
+              ${items.map(x => `
+
+                <div
+                  class="list-item ${
+                    x.done ? "completed" : ""
+                  }"
+                >
+
+                  <button
+                    class="check-button ${
+                      x.done ? "checked" : ""
+                    }"
+                    data-action="toggle-estudo"
+                    data-id="${x.id}"
+                  >
+                    ${x.done ? "✓" : ""}
+                  </button>
+
+                  <div class="item-main">
+
+                    <strong>
+                      ${esc(x.subject)}
+                    </strong>
+
+                    <span>
+                      ${
+                        x.topic
+                          ? esc(x.topic)
+                          : "Sessão de estudo"
+                      }
+
+                      ${
+                        x.duration
+                          ? ` · ${esc(x.duration)} min`
+                          : ""
+                      }
+                    </span>
+
+                    ${
+                      x.notes
+                        ? `
+                          <small>
+                            📝 ${esc(
+                              x.notes.slice(0, 100)
+                            )}
+                          </small>
+                        `
+                        : ""
+                    }
+
+                    ${
+                      x.link
+                        ? `
+                          <a
+                            class="link-button"
+                            href="${esc(x.link)}"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            🔗 Bibliografia
+                          </a>
+                        `
+                        : ""
+                    }
+
+                  </div>
+
+                  <div class="item-actions">
+
+                    <button
+                      data-action="edit-estudo"
+                      data-id="${x.id}"
+                    >
+                      ${icon("edit")}
+                    </button>
+
+                    <button
+                      data-action="delete-estudo"
+                      data-id="${x.id}"
+                    >
+                      ${icon("trash")}
+                    </button>
+
+                  </div>
+
+                </div>
+
+              `).join("")}
+
+            </div>
+          `
+          : emptyState(
+              "Nenhum estudo registrado",
+              "Cadastre uma matéria ou assunto para começar.",
+              "Adicionar estudo",
+              "add-estudos"
+            )
+      }
+
+    </div>
+
+  `);
+}
+
+/* =========================================================
+   TREINOS
+   ========================================================= */
+
+function treinos() {
+  const items = state.data.treinos || [];
+
+  return appShell(`
+
+    ${pageHeader(
+      "BEM-ESTAR",
+      "Treinos",
+      "Registre exercícios, cargas, repetições e desempenho.",
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-treinos"
+        >
+          ${icon("plus")} Novo treino
+        </button>
+      `
+    )}
+
+    <div class="content-card">
+
+      ${
+        items.length
+          ? items.map(treino => `
+
+              <div class="exercise-card">
+
+                <div class="goal-top">
+
+                  <div>
+                    <strong>
+                      ${esc(treino.name)}
+                    </strong>
+
+                    <span>
+                      ${esc(treino.type || "Treino")}
+
+                      ${
+                        treino.duration
+                          ? ` · ${esc(treino.duration)} min`
+                          : ""
+                      }
+
+                      ${
+                        treino.distance
+                          ? ` · ${esc(treino.distance)} km`
+                          : ""
+                      }
+
+                      ${
+                        treino.pace
+                          ? ` · Pace ${esc(treino.pace)}`
+                          : ""
+                      }
+                    </span>
+                  </div>
+
+                  <div>
+                    <button
+                      class="text-button"
+                      data-action="add-exercicio"
+                      data-id="${treino.id}"
+                    >
+                      + Exercício
+                    </button>
+                  </div>
+
+                </div>
+
+                ${
+                  treino.exercises?.length
+                    ? treino.exercises.map(ex => `
+
+                        <div class="list-item">
+
+                          <div class="module-icon small">
+                            ${icon("dumbbell")}
+                          </div>
+
+                          <div class="item-main">
+
+                            <strong>
+                              ${esc(ex.name)}
+                            </strong>
+
+                            <span>
+
+                              Carga:
+                              meta ${esc(ex.loadGoal || "—")}
+                              /
+                              realizada ${esc(ex.loadDone || "—")}
+
+                              ·
+
+                              Repetições:
+                              meta ${esc(ex.repsGoal || "—")}
+                              /
+                              realizadas ${esc(ex.repsDone || "—")}
+
+                            </span>
+
+                          </div>
+
+                          <div class="item-actions">
+
+                            <button
+                              data-action="animate-exercicio"
+                              data-id="${ex.id}"
+                            >
+                              ▶
+                            </button>
+
+                            <button
+                              data-action="edit-exercicio"
+                              data-id="${ex.id}"
+                              data-treino-id="${treino.id}"
+                            >
+                              ${icon("edit")}
+                            </button>
+
+                            <button
+                              data-action="delete-exercicio"
+                              data-id="${ex.id}"
+                              data-treino-id="${treino.id}"
+                            >
+                              ${icon("trash")}
+                            </button>
+
+                          </div>
+
+                        </div>
+
+                      `).join("")
+                    : `
+                      <p class="muted">
+                        Nenhum exercício cadastrado neste treino.
+                      </p>
+                    `
+                }
+
+                ${
+                  treino.observations
+                    ? `
+                      <p class="muted">
+                        ${esc(treino.observations)}
+                      </p>
+                    `
+                    : ""
+                }
+
+              </div>
+
+            `).join("")
+          : emptyState(
+              "Nenhum treino registrado",
+              "Crie seu primeiro treino para acompanhar sua evolução.",
+              "Novo treino",
+              "add-treinos"
+            )
+      }
+
+    </div>
+
+  `);
+}
+
+/* =========================================================
+   HIDRATAÇÃO
+   ========================================================= */
+
+function hidratacao() {
+  const total = state.data.hidratacao
+    .filter(x => x.date === todayISO())
+    .reduce(
+      (sum, x) => sum + Number(x.amount || 0),
+      0
+    );
+
+  const goal =
+    Number(state.settings.hydrationGoal) || 2000;
+
+  const interval =
+    Number(state.settings.hydrationInterval) || 2;
+
+  const periodAmount =
+    Number(state.settings.hydrationPeriodAmount) || 250;
+
+  const pct = Math.min(
+    100,
+    Math.round((total / goal) * 100)
+  );
+
+  return appShell(`
+
+    ${pageHeader(
+      "BEM-ESTAR",
+      "Hidratação",
+      "Acompanhe sua meta diária e a quantidade indicada por período.",
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-hidratacao"
+        >
+          ${icon("plus")} Registrar
+        </button>
+      `
+    )}
+
+    <div class="hydration-card">
+
+      <div class="hydration-top">
+
+        <div>
+
+          <span class="eyebrow">
+            HOJE
+          </span>
+
+          <h2>
+            ${total} ml
+          </h2>
+
+          <p>
+            de ${goal} ml
+          </p>
+
+          <p class="muted">
+            ${periodAmount} ml a cada ${interval} hora(s)
+          </p>
+
+        </div>
+
+        <div class="water-drop">
+          ◉
+        </div>
+
+      </div>
+
+      <div class="progress">
+        <span style="width:${pct}%"></span>
+      </div>
+
+      <div class="progress-labels">
+
+        <span>0 ml</span>
+
+        <strong>${pct}%</strong>
+
+        <span>${goal} ml</span>
+
+      </div>
+
+      <div class="quick-water">
+
+        ${[200, 300, 500].map(v => `
+          <button
+            data-action="quick-water"
+            data-value="${v}"
+          >
+            +${v} ml
+          </button>
+        `).join("")}
+
+      </div>
+
+      <button
+        class="ghost-button"
+        data-action="config-hidratacao"
+      >
+        ⚙ Definir meta e período
+      </button>
+
+    </div>
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          Registros de hoje
+        </div>
+
+        <button
+          class="text-button"
+          data-action="reset-hidratacao"
+        >
+          Limpar
+        </button>
+
+      </div>
+
+      ${
+        state.data.hidratacao.filter(
+          x => x.date === todayISO()
+        ).length
+          ? `
+            <div class="item-list">
+
+              ${state.data.hidratacao
+                .filter(x => x.date === todayISO())
+                .map(x => `
+
+                  <div class="list-item">
+
+                    <div class="module-icon small">
+                      ◉
+                    </div>
+
+                    <div class="item-main">
+
+                      <strong>
+                        ${x.amount} ml
+                      </strong>
+
+                      <span>
+                        ${new Date(
+                          x.createdAt
+                        ).toLocaleTimeString(
+                          "pt-BR",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          }
+                        )}
+                      </span>
+
+                    </div>
+
+                    <div class="item-actions">
+
+                      <button
+                        data-action="delete-hidratacao"
+                        data-id="${x.id}"
+                      >
+                        ${icon("trash")}
+                      </button>
+
+                    </div>
+
+                  </div>
+
+                `).join("")}
+
+            </div>
+          `
+          : `<p class="muted">
+              Nenhum registro hoje.
+            </p>`
+      }
+
+    </div>
+
+  `);
+}
+
+/* =========================================================
+   ALIMENTAÇÃO
+   ========================================================= */
+
+function alimentacao() {
+  const today = todayISO();
+
+  const meals = state.data.alimentacao
+    .filter(x => x.date === today)
+    .sort((a, b) =>
+      (a.time || "").localeCompare(
+        b.time || ""
+      )
+    );
+
+  const consumed = meals.reduce(
+    (sum, meal) =>
+      sum +
+      (meal.foods || []).reduce(
+        (s, food) =>
+          s + Number(food.calories || 0),
+        0
+      ),
+    0
+  );
+
+  const goal =
+    Number(state.settings.calorieGoal) || 2000;
+
+  const remaining =
+    Math.max(0, goal - consumed);
+
+  const pct = Math.min(
+    100,
+    Math.round((consumed / goal) * 100)
+  );
+
+  return appShell(`
+
+    ${pageHeader(
+      "BEM-ESTAR",
+      "Alimentação",
+      "Organize refeições, alimentos da dieta e calorias.",
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-alimentacao"
+        >
+          ${icon("plus")} Refeição
+        </button>
+      `
+    )}
+
+    <div class="calorie-summary">
+
+      <span class="eyebrow">
+        CALORIAS DE HOJE
+      </span>
+
+      <strong>
+        ${consumed} kcal
+      </strong>
+
+      <p>
+        Meta: ${goal} kcal · Restam ${remaining} kcal
+      </p>
+
+      <div class="calorie-progress">
+        <span style="width:${pct}%"></span>
+      </div>
+
+      <button
+        class="ghost-button"
+        data-action="config-calorias"
+      >
+        ⚙ Definir meta diária
+      </button>
+
+    </div>
+
+    <div class="shopping-diet-actions">
+
+      <button
+        class="ghost-button"
+        data-action="add-dieta"
+      >
+        🍽 Inserir dieta
+      </button>
+
+      <button
+        class="ghost-button"
+        data-action="dieta-para-compras"
+      >
+        🛒 Criar compras da dieta
+      </button>
+
+    </div>
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          Refeições de hoje
+        </div>
+
+      </div>
+
+      ${
+        meals.length
+          ? `
+            <div class="item-list">
+
+              ${meals.map(meal => `
+
+                <div class="list-item">
+
+                  <div class="module-icon small">
+                    🍽
+                  </div>
+
+                  <div class="item-main">
+
+                    <strong>
+                      ${esc(meal.name)}
+                    </strong>
+
+                    <span>
+                      ${esc(meal.time || "--:--")}
+                      ·
+                      ${
+                        (meal.foods || []).reduce(
+                          (s, f) =>
+                            s +
+                            Number(
+                              f.calories || 0
+                            ),
+                          0
+                        )
+                      } kcal
+                    </span>
+
+                    <small>
+
+                      ${(meal.foods || [])
+                        .map(
+                          f =>
+                            `${esc(f.name)} (${Number(
+                              f.calories || 0
+                            )} kcal)`
+                        )
+                        .join(", ")}
+
+                    </small>
+
+                  </div>
+
+                  <div class="item-actions">
+
+                    <button
+                      data-action="edit-refeicao"
+                      data-id="${meal.id}"
+                    >
+                      ${icon("edit")}
+                    </button>
+
+                    <button
+                      data-action="delete-refeicao"
+                      data-id="${meal.id}"
+                    >
+                      ${icon("trash")}
+                    </button>
+
+                  </div>
+
+                </div>
+
+              `).join("")}
+
+            </div>
+          `
+          : emptyState(
+              "Nenhuma refeição hoje",
+              "Registre sua primeira refeição para acompanhar as calorias.",
+              "Adicionar refeição",
+              "add-alimentacao"
+            )
+      }
+
+    </div>
+
+  `);
+                        }
