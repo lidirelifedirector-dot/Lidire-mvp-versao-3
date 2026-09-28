@@ -2050,3 +2050,1025 @@ function alimentacao() {
 
   `);
                         }
+/* =========================================================
+   FINANÇAS
+   ========================================================= */
+
+function financeByCategory() {
+  const result = {};
+
+  state.data.financas
+    .filter(x => x.type === "expense")
+    .forEach(x => {
+
+      const category =
+        x.category?.trim() || "Geral";
+
+      result[category] =
+        (result[category] || 0) +
+        Number(x.value || 0);
+
+    });
+
+  return result;
+}
+
+function financeChart() {
+  const data = financeByCategory();
+
+  const entries =
+    Object.entries(data);
+
+  if (!entries.length) {
+    return `
+      <p class="muted">
+        Ainda não existem gastos por categoria.
+      </p>
+    `;
+  }
+
+  const max =
+    Math.max(
+      ...entries.map(([, value]) => value)
+    );
+
+  return entries
+    .sort((a, b) => b[1] - a[1])
+    .map(([category, value]) => {
+
+      const pct =
+        max
+          ? Math.round((value / max) * 100)
+          : 0;
+
+      const limit =
+        Number(
+          state.settings.financeLimits?.[category] || 0
+        );
+
+      const warning =
+        limit > 0
+          ? `
+            <div
+              class="limit-warning ${
+                value > limit
+                  ? "limit-danger"
+                  : "limit-ok"
+              }"
+            >
+              Teto: ${money(limit)}
+              ·
+              ${value > limit
+                ? "Teto ultrapassado"
+                : `Restam ${money(limit - value)}`}
+            </div>
+          `
+          : "";
+
+      return `
+        <div class="chart-row">
+
+          <div class="chart-label">
+
+            <span>
+              ${esc(category)}
+            </span>
+
+            <strong>
+              ${money(value)}
+            </strong>
+
+          </div>
+
+          <div class="chart-bar">
+            <span style="width:${pct}%"></span>
+          </div>
+
+          ${warning}
+
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function financas() {
+  const income =
+    state.data.financas
+      .filter(x => x.type === "income")
+      .reduce(
+        (s, x) => s + Number(x.value || 0),
+        0
+      );
+
+  const expense =
+    state.data.financas
+      .filter(x => x.type === "expense")
+      .reduce(
+        (s, x) => s + Number(x.value || 0),
+        0
+      );
+
+  return appShell(`
+
+    ${pageHeader(
+      "DINHEIRO",
+      "Finanças",
+      "Tenha uma visão simples do que entra e sai.",
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-financas"
+        >
+          ${icon("plus")} Lançamento
+        </button>
+      `
+    )}
+
+    <div class="stats-grid mini">
+
+      ${statCard(
+        money(income),
+        "Entradas",
+        "cyan"
+      )}
+
+      ${statCard(
+        money(expense),
+        "Saídas",
+        "pink"
+      )}
+
+      ${statCard(
+        money(income - expense),
+        "Saldo",
+        "purple"
+      )}
+
+    </div>
+
+    <div class="content-card finance-chart">
+
+      <div class="card-toolbar">
+
+        <div>
+          <div class="toolbar-title">
+            Gastos por categoria
+          </div>
+
+          <small>
+            Visão dos gastos registrados
+          </small>
+        </div>
+
+        <button
+          class="text-button"
+          data-action="config-tetos"
+        >
+          ⚙ Tetos
+        </button>
+
+      </div>
+
+      ${financeChart()}
+
+    </div>
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          Lançamentos
+        </div>
+
+      </div>
+
+      ${
+        state.data.financas.length
+          ? `
+            <div class="item-list">
+
+              ${state.data.financas
+                .slice()
+                .reverse()
+                .map(x => `
+
+                  <div class="list-item">
+
+                    <div
+                      class="finance-icon ${
+                        x.type
+                      }"
+                    >
+                      ${
+                        x.type === "income"
+                          ? "↑"
+                          : "↓"
+                      }
+                    </div>
+
+                    <div class="item-main">
+
+                      <strong>
+                        ${esc(x.title)}
+                      </strong>
+
+                      <span>
+                        ${dateBR(
+                          x.date || todayISO()
+                        )}
+                        ·
+                        ${
+                          x.category
+                            ? esc(x.category)
+                            : "Geral"
+                        }
+                      </span>
+
+                    </div>
+
+                    <strong
+                      class="finance-value ${
+                        x.type
+                      }"
+                    >
+                      ${
+                        x.type === "income"
+                          ? "+"
+                          : "-"
+                      }
+                      ${money(x.value)}
+                    </strong>
+
+                    <div class="item-actions">
+
+                      <button
+                        data-action="delete-financa"
+                        data-id="${x.id}"
+                      >
+                        ${icon("trash")}
+                      </button>
+
+                    </div>
+
+                  </div>
+
+                `).join("")}
+
+            </div>
+          `
+          : emptyState(
+              "Nenhum lançamento",
+              "Registre uma entrada ou saída.",
+              "Adicionar lançamento",
+              "add-financas"
+            )
+      }
+
+    </div>
+
+  `);
+}
+
+/* =========================================================
+   OBJETIVOS
+   ========================================================= */
+
+function objetivos() {
+  const items =
+    state.data.objetivos || [];
+
+  return appShell(`
+
+    ${pageHeader(
+      "DIREÇÃO",
+      "Objetivos",
+      "Dê forma aos planos que você quer realizar.",
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-objetivos"
+        >
+          ${icon("plus")} Objetivo
+        </button>
+      `
+    )}
+
+    <div class="content-card">
+
+      ${
+        items.length
+          ? items.map(x => `
+
+              <div class="goal-item">
+
+                <div class="goal-top">
+
+                  <div>
+
+                    <strong>
+                      ${esc(x.title)}
+                    </strong>
+
+                    <span>
+
+                      ${
+                        x.deadline
+                          ? `Até ${dateBR(
+                              x.deadline
+                            )}`
+                          : "Sem prazo"
+                      }
+
+                      ${
+                        Number(x.moneyGoal || 0) > 0
+                          ? ` · Meta financeira ${money(
+                              x.moneyGoal
+                            )}`
+                          : ""
+                      }
+
+                    </span>
+
+                  </div>
+
+                  <b>
+                    ${Number(
+                      x.progress || 0
+                    )}%
+                  </b>
+
+                </div>
+
+                <div class="progress">
+                  <span
+                    style="width:${Math.min(
+                      100,
+                      Number(x.progress || 0)
+                    )}%"
+                  ></span>
+                </div>
+
+                ${
+                  x.observations
+                    ? `
+                      <p class="muted">
+                        ${esc(
+                          x.observations
+                        )}
+                      </p>
+                    `
+                    : ""
+                }
+
+                <div class="goal-subtasks">
+
+                  ${
+                    x.metas?.length
+                      ? x.metas.map(meta => `
+
+                          <div class="goal-subtask">
+
+                            <button
+                              class="check-button ${
+                                meta.done
+                                  ? "checked"
+                                  : ""
+                              }"
+                              data-action="toggle-meta"
+                              data-id="${meta.id}"
+                              data-goal-id="${x.id}"
+                            >
+                              ${
+                                meta.done
+                                  ? "✓"
+                                  : ""
+                              }
+                            </button>
+
+                            <div class="item-main">
+
+                              <strong>
+                                ${esc(
+                                  meta.title
+                                )}
+                              </strong>
+
+                              <span>
+                                ${esc(
+                                  meta.period
+                                )}
+                              </span>
+
+                            </div>
+
+                          </div>
+
+                        `).join("")
+                      : `
+                        <p class="muted">
+                          Nenhuma meta interna cadastrada.
+                        </p>
+                      `
+                  }
+
+                </div>
+
+                <div class="goal-actions">
+
+                  <button
+                    data-action="add-meta"
+                    data-id="${x.id}"
+                  >
+                    + Meta
+                  </button>
+
+                  <button
+                    data-action="progress-objetivo"
+                    data-id="${x.id}"
+                  >
+                    Atualizar progresso
+                  </button>
+
+                  <button
+                    data-action="edit-objetivo"
+                    data-id="${x.id}"
+                  >
+                    Editar
+                  </button>
+
+                  <button
+                    data-action="delete-objetivo"
+                    data-id="${x.id}"
+                  >
+                    Excluir
+                  </button>
+
+                </div>
+
+              </div>
+
+            `).join("")
+          : emptyState(
+              "Nenhum objetivo",
+              "Crie um objetivo e transforme-o em pequenas metas.",
+              "Criar objetivo",
+              "add-objetivos"
+            )
+      }
+
+    </div>
+
+  `);
+}
+
+/* =========================================================
+   FAMÍLIA
+   ========================================================= */
+
+function familia() {
+  return listPage({
+    key: "familia",
+
+    title: "Família",
+
+    subtitle:
+      "Uma visão compartilhada para organizar a vida juntos.",
+
+    eyebrow: "COMPARTILHAMENTO",
+
+    emptyTitle:
+      "Ainda não há pessoas adicionadas",
+
+    emptyText:
+      "Cadastre pessoas para estruturar sua área familiar.",
+
+    render: x => `
+
+      <div class="list-item">
+
+        <div class="avatar">
+          ${esc(
+            (x.name || "?")
+              .charAt(0)
+              .toUpperCase()
+          )}
+        </div>
+
+        <div class="item-main">
+
+          <strong>
+            ${esc(x.name)}
+          </strong>
+
+          <span>
+            ${esc(
+              x.relation || "Membro"
+            )}
+
+            ${
+              x.email
+                ? ` · ${esc(x.email)}`
+                : ""
+            }
+          </span>
+
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            data-action="delete-familia"
+            data-id="${x.id}"
+          >
+            ${icon("trash")}
+          </button>
+
+        </div>
+
+      </div>
+    `
+  });
+}
+
+/* =========================================================
+   ASSISTENTE
+   ========================================================= */
+
+function assistente() {
+  const pending =
+    state.data.tarefas.filter(
+      x => !x.done
+    );
+
+  const today =
+    state.data.compromissos.filter(
+      x => x.date === todayISO()
+    );
+
+  return appShell(`
+
+    ${pageHeader(
+      "INTELIGÊNCIA",
+      "Assistente LiDire",
+      "Uma visão rápida da sua rotina para ajudar você a encontrar o próximo passo."
+    )}
+
+    <div class="assistant-screen">
+
+      <div class="assistant-avatar">
+        ✦
+      </div>
+
+      <h2>
+        Como posso ajudar?
+      </h2>
+
+      <p>
+        Experimente uma das sugestões abaixo.
+      </p>
+
+      <div class="suggestions">
+
+        <button
+          data-action="assistant-question"
+          data-question="O que tenho para hoje?"
+        >
+          O que tenho para hoje?
+        </button>
+
+        <button
+          data-action="assistant-question"
+          data-question="Quais tarefas estão pendentes?"
+        >
+          Quais tarefas estão pendentes?
+        </button>
+
+        <button
+          data-action="assistant-question"
+          data-question="Como está minha rotina?"
+        >
+          Como está minha rotina?
+        </button>
+
+      </div>
+
+      <div
+        id="assistant-response"
+        class="assistant-response"
+      >
+
+        <strong>
+          Resumo atual
+        </strong>
+
+        <p>
+          Você tem
+          <b>${pending.length}</b>
+          tarefa(s) pendente(s) e
+          <b>${today.length}</b>
+          compromisso(s) hoje.
+        </p>
+
+      </div>
+
+    </div>
+
+  `);
+}
+
+/* =========================================================
+   EXPLORAR
+   ========================================================= */
+
+function explorar() {
+  return appShell(`
+
+    ${pageHeader(
+      "LIDIRE",
+      "Tudo em um só lugar",
+      "Conheça os espaços que ajudam a transformar rotina em clareza."
+    )}
+
+    <div class="explore-grid">
+
+      ${modules.map(moduleCard).join("")}
+
+      <button
+        class="module-card featured"
+        data-page="assistente"
+      >
+
+        <span class="module-icon">
+          ✦
+        </span>
+
+        <span class="module-content">
+
+          <strong>
+            Assistente LiDire
+          </strong>
+
+          <small>
+            Seu copiloto para organizar a rotina.
+          </small>
+
+        </span>
+
+        <span class="module-arrow">
+          ${icon("arrow")}
+        </span>
+
+      </button>
+
+    </div>
+
+  `);
+}
+
+/* =========================================================
+   PERFIL
+   ========================================================= */
+
+function perfil() {
+  return appShell(`
+
+    ${pageHeader(
+      "MINHA CONTA",
+      "Perfil",
+      "Personalize sua experiência na LiDire."
+    )}
+
+    <div class="profile-card">
+
+      <div class="profile-avatar">
+
+        ${
+          state.user.photo
+            ? `
+              <img
+                class="profile-photo-preview"
+                src="${esc(state.user.photo)}"
+                alt="Foto de perfil"
+              >
+            `
+            : esc(
+                (state.user.name || "A")
+                  .charAt(0)
+                  .toUpperCase()
+              )
+        }
+
+      </div>
+
+      <h2>
+        ${esc(
+          state.user.name || "Seu nome"
+        )}
+      </h2>
+
+      <p>
+        ${esc(
+          state.user.email ||
+          "Adicione seu e-mail"
+        )}
+      </p>
+
+      <button
+        class="primary-button"
+        data-action="edit-profile"
+      >
+        ${icon("edit")} Editar perfil
+      </button>
+
+    </div>
+
+    <div class="settings-card">
+
+      <button data-action="edit-profile">
+        <span>✎</span>
+
+        <div>
+          <strong>
+            Dados pessoais
+          </strong>
+
+          <small>
+            Nome, e-mail, idade e telefone
+          </small>
+        </div>
+
+        ${icon("arrow")}
+      </button>
+
+      <button data-action="photo-profile">
+        <span>📷</span>
+
+        <div>
+          <strong>
+            Foto de perfil
+          </strong>
+
+          <small>
+            Adicionar, alterar ou excluir
+          </small>
+        </div>
+
+        ${icon("arrow")}
+      </button>
+
+      <button data-action="clear-local">
+
+        <span>↺</span>
+
+        <div>
+
+          <strong>
+            Redefinir dados locais
+          </strong>
+
+          <small>
+            Apaga os dados salvos neste dispositivo
+          </small>
+
+        </div>
+
+        ${icon("arrow")}
+
+      </button>
+
+    </div>
+
+  `);
+}
+
+const pages = {
+  inicio: home,
+  agenda,
+  tarefas,
+  compras,
+  estudos,
+  treinos,
+  hidratacao,
+  alimentacao,
+  financas,
+  objetivos,
+  familia,
+  assistente,
+  explorar,
+  perfil
+};
+
+function render() {
+  const root =
+    document.getElementById("app");
+
+  if (!root) return;
+
+  if (
+    currentPage === "compras" &&
+    currentShoppingList
+  ) {
+    root.innerHTML =
+      listaCompras(
+        currentShoppingList
+      );
+  } else {
+    root.innerHTML =
+      (
+        pages[currentPage] ||
+        home
+      )();
+  }
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+
+/* =========================================================
+   MODAIS
+   ========================================================= */
+
+function openModal(
+  title,
+  body,
+  options = {}
+) {
+  closeModal();
+
+  modal =
+    document.createElement("div");
+
+  modal.className =
+    "modal-backdrop";
+
+  modal.innerHTML = `
+
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+    >
+
+      <div class="modal-header">
+
+        <div>
+
+          <span class="eyebrow">
+            ${esc(
+              options.eyebrow ||
+              "LIDIRE"
+            )}
+          </span>
+
+          <h2>
+            ${esc(title)}
+          </h2>
+
+        </div>
+
+        <button
+          class="modal-close"
+          data-action="close-modal"
+        >
+          ×
+        </button>
+
+      </div>
+
+      <form
+        id="lidire-form"
+        class="form-grid"
+      >
+
+        ${body}
+
+        <div class="modal-footer">
+
+          <button
+            type="button"
+            class="ghost-button"
+            data-action="close-modal"
+          >
+            Cancelar
+          </button>
+
+          <button
+            class="primary-button"
+            type="submit"
+          >
+            ${esc(
+              options.submit ||
+              "Salvar"
+            )}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal
+    .querySelector(
+      "input, select, textarea"
+    )
+    ?.focus();
+}
+
+function closeModal() {
+  document
+    .querySelector(
+      ".modal-backdrop"
+    )
+    ?.remove();
+
+  modal = null;
+}
+
+function field(
+  label,
+  name,
+  type = "text",
+  value = "",
+  extra = ""
+) {
+  return `
+    <label class="form-field">
+
+      <span>
+        ${esc(label)}
+      </span>
+
+      <input
+        name="${esc(name)}"
+        type="${type}"
+        value="${esc(value)}"
+        ${extra}
+      >
+
+    </label>
+  `;
+}
+
+function textareaField(
+  label,
+  name,
+  value = "",
+  extra = ""
+) {
+  return `
+    <label class="form-field">
+
+      <span>
+        ${esc(label)}
+      </span>
+
+      <textarea
+        name="${esc(name)}"
+        ${extra}
+      >${esc(value)}</textarea>
+
+    </label>
+  `;
+}
+
+function selectField(
+  label,
+  name,
+  options,
+  selected = ""
+) {
+  return `
+    <label class="form-field">
+
+      <span>
+        ${esc(label)}
+      </span>
+
+      <select name="${esc(name)}">
+
+        ${options.map(option => `
+          <option
+            value="${esc(option)}"
+            ${
+              option === selected
+                ? "selected"
+                : ""
+            }
+          >
+            ${esc(option)}
+          </option>
+        `).join("")}
+
+      </select>
+
+    </label>
+  `;
+          }
