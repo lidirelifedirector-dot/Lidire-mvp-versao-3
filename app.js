@@ -1,616 +1,5169 @@
-const STORAGE_KEY="lidire-mvp-data";
+const STORAGE_KEY = "lidire-mvp-data";
 
-const initialState={
-  page:"inicio",
-  user:{name:"Alice",email:"conta@lidire.com",phone:"",age:""},
-  data:{
-    tarefas:[],compromissos:[],compras:[],estudos:[],treinos:[],
-    lembretes:[],agua:0,fin:{receitas:[],despesas:[]},objetivos:[],familia:[]
+const defaultState = {
+  user: {
+    name: "Alice",
+    email: "conta@lidire.com",
+    age: "",
+    phone: "",
+    photo: ""
+  },
+
+  data: {
+    compromissos: [],
+    tarefas: [],
+    compras: [],
+    estudos: [],
+    treinos: [],
+    hidratacao: [],
+    hidratacaoConfig: {
+      amountPerPeriod: 300,
+      intervalMinutes: 120,
+      startTime: "08:00",
+      endTime: "20:00"
+    },
+    alimentacao: [],
+    alimentacaoConfig: {
+      dailyCalories: 2000
+    },
+    financas: [],
+    objetivos: [],
+    familia: []
   }
 };
 
-const state=JSON.parse(JSON.stringify(initialState));
+let state = loadState();
+let currentPage = "inicio";
+let currentShoppingList = null;
+let modal = null;
 
-const icon={
-  inicio:"⌂",agenda:"▣",assistente:"✦",explorar:"◈",perfil:"●",
-  tarefa:"✓",compra:"🛒",estudo:"📚",treino:"🏋️",agua:"💧",fin:"💰",familia:"👨‍👩‍👧"
-};
-
-const modules={
-  tarefas:["✓","Tarefas","Organize o que precisa ser feito."],
-  compras:["🛒","Compras","Crie listas e marque os itens concluídos."],
-  estudos:["📚","Estudos","Planeje atividades e acompanhe seu progresso."],
-  treinos:["🏋️","Treinos","Registre exercícios, séries e repetições."],
-  hidratacao:["💧","Hidratação","Acompanhe sua meta diária de água."],
-  financas:["💰","Finanças","Registre receitas e despesas."],
-  objetivos:["🎯","Objetivos","Transforme planos em metas acompanháveis."],
-  familia:["👨‍👩‍👧","Família","Compartilhe informações da rotina."]
-};
-
-function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function uid(p="id"){return p+"-"+Date.now()+"-"+Math.random().toString(36).slice(2,8);}
-function today(){return new Date().toISOString().slice(0,10);}
-function formatDate(d){if(!d)return"";const p=String(d).split("-");return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:d;}
-function money(v){return Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});}
-function num(v){const n=Number(String(v??"").replace(",","."));return Number.isFinite(n)?n:0;}
-
-function toast(message){
-  let e=document.querySelector(".toast");
-  if(!e){e=document.createElement("div");e.className="toast";e.style.cssText="position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:9999;padding:12px 18px;border-radius:14px;background:#151b3d;color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:14px;max-width:90%;text-align:center";document.body.appendChild(e);}
-  e.textContent=message;e.style.display="block";clearTimeout(window.__lidireToast);
-  window.__lidireToast=setTimeout(()=>e.style.display="none",2200);
+function cloneDefaultState() {
+  return JSON.parse(JSON.stringify(defaultState));
 }
 
-function persist(){
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({user:state.user,data:state.data}));}
-  catch(e){console.error("Erro ao salvar dados:",e);}
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+
+    if (!saved) {
+      return cloneDefaultState();
+    }
+
+    return {
+      ...cloneDefaultState(),
+      ...saved,
+
+      user: {
+        ...defaultState.user,
+        ...(saved.user || {})
+      },
+
+      data: {
+        ...defaultState.data,
+        ...(saved.data || {}),
+
+        hidratacaoConfig: {
+          ...defaultState.data.hidratacaoConfig,
+          ...((saved.data || {}).hidratacaoConfig || {})
+        },
+
+        alimentacaoConfig: {
+          ...defaultState.data.alimentacaoConfig,
+          ...((saved.data || {}).alimentacaoConfig || {})
+        }
+      }
+    };
+  } catch (error) {
+    console.error("Erro ao carregar dados:", error);
+    return cloneDefaultState();
+  }
 }
 
-function normalize(){
-  ["tarefas","compromissos","compras","estudos","treinos","lembretes","objetivos","familia"].forEach(k=>{
-    if(!Array.isArray(state.data[k]))state.data[k]=[];
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function uid(prefix = "id") {
+  return `${prefix}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 7)}`;
+}
+
+function esc(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
   });
-  if(!state.data.fin)state.data.fin={receitas:[],despesas:[]};
-  if(!Array.isArray(state.data.fin.receitas))state.data.fin.receitas=[];
-  if(!Array.isArray(state.data.fin.despesas))state.data.fin.despesas=[];
-  state.data.agua=Number(state.data.agua)||0;
 }
 
-function loadLocal(){
-  try{
-    const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
-    if(s?.user)state.user={...state.user,...s.user};
-    if(s?.data)state.data={...state.data,...s.data};
-  }catch(e){console.error("Erro ao carregar dados:",e);}
-  normalize();
+function dateBR(value) {
+  if (!value) return "";
+
+  const [y, m, d] = String(value).split("-");
+
+  return y && m && d ? `${d}/${m}/${y}` : value;
 }
 
-function go(page){state.page=page;render();window.scrollTo({top:0,behavior:"smooth"});}
-
-function stat(v,l){return`<div class="stat"><b>${v}</b><span>${l}</span></div>`;}
-function quick(ic,title,text,target){return`<button class="item" data-page="${target}"><span class="ico">${icon[ic]||ic}</span><span style="text-align:left;flex:1"><b>${title}</b><br><small class="muted">${text}</small></span><span>›</span></button>`;}
-function emptyState(msg,label,action){return`<div class="card" style="text-align:center;padding:28px 20px"><div style="font-size:34px">✦</div><p class="muted">${msg}</p><button class="primary" data-action="${action}">${label}</button></div>`;}
-
-function layout(content){
-  const nav=[["inicio","Início"],["agenda","Agenda"],["assistente","Assistente"],["explorar","Explorar"],["perfil","Perfil"]];
-  return`<div class="app-shell">
-    <header class="topbar"><div class="brand"><img src="/logo-lidire-oficial.png" alt="LiDire"><div><strong>LiDire</strong><small>Seu Copiloto para a Vida</small></div></div>
-    <button class="icon-btn" data-action="notifications" aria-label="Notificações">♧</button></header>
-    <main>${content}</main>
-    <nav class="bottom-nav">${nav.map(([id,label])=>`<button class="nav-btn ${state.page===id?"active":""}" data-page="${id}"><span class="nav-ico">${icon[id]}</span>${label}</button>`).join("")}</nav>
-  </div>`;
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function render(){
-  try{
-    const app=document.getElementById("app");
-    if(!app)throw new Error("Elemento #app não encontrado.");
-    const pages={inicio:home,agenda,assistente:renderAssistant,explorar:explore,perfil:profile};
-    app.innerHTML=layout(pages[state.page]?pages[state.page]():modulePage(state.page));
-  }catch(e){console.error(e);showAppError(e);}
+function toast(message, type = "success") {
+  document.querySelectorAll(".lidire-toast").forEach((el) => el.remove());
+
+  const el = document.createElement("div");
+
+  el.className = `lidire-toast ${type}`;
+
+  el.innerHTML = `
+    <span>${type === "success" ? "✓" : "!"}</span>
+    ${esc(message)}
+  `;
+
+  document.body.appendChild(el);
+
+  setTimeout(() => el.remove(), 2600);
 }
 
-function showAppError(e){
-  const app=document.getElementById("app");if(!app)return;
-  app.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#070C22;color:#fff;font-family:Inter,Arial,sans-serif"><div style="max-width:520px;padding:28px;border-radius:20px;background:rgba(255,255,255,.06)"><div style="font-size:42px">⚠️</div><h1>A LiDire encontrou um erro</h1><p style="color:#b9bfd3">O aplicativo foi carregado, mas ocorreu um erro ao montar esta tela.</p><details><summary>Detalhes técnicos</summary><pre style="white-space:pre-wrap">${esc(e?.message||e)}</pre></details><button data-action="reload" style="margin-top:20px;padding:12px 18px;border:0;border-radius:12px">Recarregar LiDire</button></div></div>`;
+function icon(name) {
+  const icons = {
+    home: "⌂",
+    calendar: "▣",
+    check: "✓",
+    cart: "🛒",
+    book: "▤",
+    dumbbell: "♢",
+    drop: "◉",
+    wallet: "R$",
+    target: "◎",
+    family: "♧",
+    food: "🍽️",
+    spark: "✦",
+    user: "◯",
+    plus: "+",
+    arrow: "→",
+    trash: "⌫",
+    edit: "✎",
+    clock: "◷",
+    search: "⌕",
+    back: "‹",
+    camera: "📷"
+  };
+
+  return icons[name] || "•";
 }
 
-function home(){
-  const pt=state.data.tarefas.filter(x=>!x.done).length;
-  const pc=state.data.compras.filter(x=>!x.done).length;
-  const ca=state.data.compromissos.filter(x=>!x.date||x.date===today()).length;
-  const ps=state.data.estudos.filter(x=>!x.done).length;
-  return`<section class="hero-card card"><div class="eyebrow">Seu Copiloto para a Vida</div><h1>Olá,<br><span class="gradient-text">${esc(state.user.name)}!</span> ☀️</h1><p class="muted">Aqui está um resumo da sua rotina. Vamos organizar o que importa?</p><div class="stat-grid">${stat(pt,"Tarefas pendentes")}${stat(ca,"Compromissos hoje")}${stat(ps,"Estudos pendentes")}${stat(pc,"Itens para comprar")}</div></section>
-  <div class="row"><h2>Meu dia</h2><button class="secondary" data-page="assistente">Falar com a LiDire</button></div>
-  <div class="stack">${quick("tarefa","Tarefas","Crie, conclua e exclua tarefas.","tarefas")}${quick("agenda","Agenda","Adicione e gerencie compromissos.","agenda")}${quick("compra","Compras","Sua lista fica salva no dispositivo.","compras")}${quick("estudo","Estudos","Planeje o que precisa estudar.","estudos")}</div>
-  <div class="card"><div class="row"><div><h3>Insight da LiDire</h3><p class="muted">${assistantInsight()}</p></div><span class="ico">✦</span></div></div>`;
-}
-function assistantInsight(){
-  const t=state.data.tarefas.filter(x=>!x.done).length,c=state.data.compromissos.filter(x=>x.date===today()).length;
-  if(!t&&!c)return"Sua rotina está tranquila. Aproveite para planejar o próximo passo.";
-  if(t>5)return"Você tem várias tarefas pendentes. Que tal escolher as três mais importantes?";
-  if(c)return`Você tem ${c} compromisso(s) hoje. Organize suas tarefas ao redor deles.`;
-  return"Continue registrando sua rotina. A LiDire vai ficando mais útil conforme você usa.";
-}
+const modules = [
+  ["agenda", "Agenda", "Compromissos e horários", "calendar", "agenda"],
+  ["tarefas", "Tarefas", "Tudo o que precisa ser feito", "check", "tarefas"],
+  ["compras", "Compras", "Listas para não esquecer", "cart", "compras"],
+  ["estudos", "Estudos", "Organize seu aprendizado", "book", "estudos"],
+  ["treinos", "Treinos", "Movimente-se e acompanhe", "dumbbell", "treinos"],
+  ["hidratacao", "Hidratação", "Cuide da sua rotina", "drop", "hidratacao"],
+  ["alimentacao", "Alimentação", "Refeições e calorias", "food", "alimentacao"],
+  ["financas", "Finanças", "Entradas e gastos", "wallet", "financas"],
+  ["objetivos", "Objetivos", "Transforme planos em passos", "target", "objetivos"],
+  ["familia", "Família", "Compartilhe sua rotina", "family", "familia"]
+];
 
-function agenda(){
-  const items=[...state.data.compromissos].sort((a,b)=>`${a.date||""} ${a.time||""}`.localeCompare(`${b.date||""} ${b.time||""}`));
-  return`<div class="page-header"><div><div class="eyebrow">Minha rotina</div><h1>Agenda</h1><p class="muted">Seus compromissos em um só lugar.</p></div><button class="primary" data-action="add-commitment">+ Novo</button></div><div class="stack">${items.length?items.map(commitmentCard).join(""):emptyState("Você ainda não possui compromissos.","Adicionar compromisso","add-commitment")}</div>`;
-}
-function commitmentCard(x){return`<div class="card item-row"><div class="ico">📅</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${formatDate(x.date)}${x.time?" • "+esc(x.time):""}</div>${x.note?`<small class="muted">${esc(x.note)}</small>`:""}</div><button class="icon-btn" data-action="edit-commitment" data-id="${x.id}">✎</button><button class="icon-btn" data-action="delete-commitment" data-id="${x.id}">🗑</button></div>`;}
-function addCommitment(){
-  const title=prompt("Nome do compromisso:");if(!title?.trim())return;
-  state.data.compromissos.push({id:uid("comp"),title:title.trim(),date:prompt("Data (AAAA-MM-DD):",today())||today(),time:prompt("Horário (opcional):","")||"",note:prompt("Observação (opcional):","")||""});
-  persist();render();toast("Compromisso adicionado.");
-}
-function editCommitment(id){
-  const x=state.data.compromissos.find(x=>x.id===id);if(!x)return;
-  const title=prompt("Nome do compromisso:",x.title);if(!title?.trim())return;
-  x.title=title.trim();x.date=prompt("Data (AAAA-MM-DD):",x.date||today())||x.date;x.time=prompt("Horário:",x.time||"")||"";x.note=prompt("Observação:",x.note||"")||"";
-  persist();render();toast("Compromisso atualizado.");
-}
-function deleteCommitment(id){if(!confirm("Excluir este compromisso?"))return;state.data.compromissos=state.data.compromissos.filter(x=>x.id!==id);persist();render();toast("Compromisso excluído.");}
+function appShell(content) {
+  const nav = [
+    ["inicio", "⌂", "Início"],
+    ["agenda", "▣", "Agenda"],
+    ["tarefas", "✓", "Tarefas"],
+    ["explorar", "✦", "Explorar"],
+    ["perfil", "◯", "Perfil"]
+  ];
 
-function tasksPage(){const a=state.data.tarefas;return`<div class="page-header"><div><div class="eyebrow">Organização</div><h1>Tarefas</h1><p class="muted">Tudo o que você precisa fazer.</p></div><button class="primary" data-action="add-task">+ Nova</button></div><div class="stack">${a.length?a.map(taskCard).join(""):emptyState("Nenhuma tarefa cadastrada.","Criar tarefa","add-task")}</div>`;}
-function taskCard(x){return`<div class="card item-row"><button class="check-btn ${x.done?"done":""}" data-action="toggle-task" data-id="${x.id}">${x.done?"✓":""}</button><div style="flex:1"><b style="${x.done?"text-decoration:line-through;opacity:.55;":""}">${esc(x.title)}</b>${x.date?`<div class="muted">${formatDate(x.date)}</div>`:""}</div><button class="icon-btn" data-action="edit-task" data-id="${x.id}">✎</button><button class="icon-btn" data-action="delete-task" data-id="${x.id}">🗑</button></div>`;}
-function addTask(){const title=prompt("Qual tarefa você precisa realizar?");if(!title?.trim())return;state.data.tarefas.push({id:uid("task"),title:title.trim(),date:prompt("Data (AAAA-MM-DD) ou deixe vazio:","")||"",done:false});persist();render();toast("Tarefa criada.");}
-function toggleTask(id){const x=state.data.tarefas.find(x=>x.id===id);if(!x)return;x.done=!x.done;persist();render();toast(x.done?"Tarefa concluída.":"Tarefa reaberta.");}
-function editTask(id){const x=state.data.tarefas.find(x=>x.id===id);if(!x)return;const t=prompt("Editar tarefa:",x.title);if(!t?.trim())return;x.title=t.trim();x.date=prompt("Data (AAAA-MM-DD):",x.date||"")||"";persist();render();toast("Tarefa atualizada.");}
-function deleteTask(id){if(!confirm("Excluir esta tarefa?"))return;state.data.tarefas=state.data.tarefas.filter(x=>x.id!==id);persist();render();toast("Tarefa excluída.");}
+  return `
+    <div class="app-bg">
 
-function shoppingPage(){const a=state.data.compras;return`<div class="page-header"><div><div class="eyebrow">Lista</div><h1>Compras</h1><p class="muted">Não esqueça o que precisa comprar.</p></div><button class="primary" data-action="add-shopping">+ Item</button></div><div class="stack">${a.length?a.map(shoppingCard).join(""):emptyState("Sua lista de compras está vazia.","Adicionar item","add-shopping")}</div>`;}
-function shoppingCard(x){return`<div class="card item-row"><button class="check-btn ${x.done?"done":""}" data-action="toggle-shopping" data-id="${x.id}">${x.done?"✓":""}</button><div style="flex:1"><b style="${x.done?"text-decoration:line-through;opacity:.55;":""}">${esc(x.title)}</b>${x.quantity?`<div class="muted">Quantidade: ${esc(x.quantity)}</div>`:""}</div><button class="icon-btn" data-action="delete-shopping" data-id="${x.id}">🗑</button></div>`;}
-function addShopping(){const title=prompt("O que você precisa comprar?");if(!title?.trim())return;state.data.compras.push({id:uid("buy"),title:title.trim(),quantity:prompt("Quantidade (opcional):","")||"",done:false});persist();render();toast("Item adicionado à lista.");}
-function toggleShopping(id){const x=state.data.compras.find(x=>x.id===id);if(!x)return;x.done=!x.done;persist();render();}
-function deleteShopping(id){state.data.compras=state.data.compras.filter(x=>x.id!==id);persist();render();toast("Item removido.");}
+      <header class="topbar">
 
-function studiesPage(){const a=state.data.estudos;return`<div class="page-header"><div><div class="eyebrow">Aprendizado</div><h1>Estudos</h1><p class="muted">Organize seu plano de estudos.</p></div><button class="primary" data-action="add-study">+ Estudo</button></div><div class="stack">${a.length?a.map(studyCard).join(""):emptyState("Nenhuma atividade de estudo cadastrada.","Adicionar estudo","add-study")}</div>`;}
-function studyCard(x){return`<div class="card item-row"><button class="check-btn ${x.done?"done":""}" data-action="toggle-study" data-id="${x.id}">${x.done?"✓":""}</button><div style="flex:1"><b>${esc(x.title)}</b>${x.subject?`<div class="muted">${esc(x.subject)}</div>`:""}${x.date?`<small class="muted">${formatDate(x.date)}</small>`:""}</div><button class="icon-btn" data-action="delete-study" data-id="${x.id}">🗑</button></div>`;}
-function addStudy(){const title=prompt("O que você vai estudar?");if(!title?.trim())return;state.data.estudos.push({id:uid("study"),title:title.trim(),subject:prompt("Matéria ou área:","")||"",date:prompt("Data (AAAA-MM-DD):",today())||today(),done:false});persist();render();toast("Estudo adicionado.");}
-function toggleStudy(id){const x=state.data.estudos.find(x=>x.id===id);if(!x)return;x.done=!x.done;persist();render();}
-function deleteStudy(id){state.data.estudos=state.data.estudos.filter(x=>x.id!==id);persist();render();toast("Estudo removido.");}
+        <button
+          class="brand"
+          data-page="inicio"
+          aria-label="Ir para início"
+        >
+          <img
+            src="/logo-lidire-oficial.png"
+            alt="LiDire"
+          >
 
-function workoutsPage(){const a=state.data.treinos;return`<div class="page-header"><div><div class="eyebrow">Bem-estar</div><h1>Treinos</h1><p class="muted">Registre seus exercícios.</p></div><button class="primary" data-action="add-workout">+ Treino</button></div><div class="stack">${a.length?a.map(workoutCard).join(""):emptyState("Nenhum treino registrado.","Adicionar treino","add-workout")}</div>`;}
-function workoutCard(x){return`<div class="card item-row"><div class="ico">🏋️</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${formatDate(x.date)}${x.duration?" • "+esc(x.duration):""}</div>${x.notes?`<small class="muted">${esc(x.notes)}</small>`:""}</div><button class="icon-btn" data-action="delete-workout" data-id="${x.id}">🗑</button></div>`;}
-function addWorkout(){const title=prompt("Qual treino você fez?");if(!title?.trim())return;state.data.treinos.push({id:uid("workout"),title:title.trim(),duration:prompt("Duração (ex.: 45 min):","")||"",notes:prompt("Observações:","")||"",date:today()});persist();render();toast("Treino registrado.");}
-function deleteWorkout(id){state.data.treinos=state.data.treinos.filter(x=>x.id!==id);persist();render();toast("Treino removido.");}
+          <span>LiDire</span>
+        </button>
 
-function hydrationPage(){const g=Number(state.data.agua)||0,goal=8,p=Math.min(100,Math.round(g/goal*100));return`<div class="page-header"><div><div class="eyebrow">Bem-estar</div><h1>Hidratação</h1><p class="muted">Acompanhe sua água durante o dia.</p></div></div><div class="card" style="text-align:center"><div style="font-size:64px">💧</div><h2>${g} / ${goal} copos</h2><div style="height:12px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:20px 0"><div style="width:${p}%;height:100%;border-radius:99px;background:linear-gradient(90deg,#6c5ce7,#27d7ff)"></div></div><p class="muted">${p}% da meta diária</p><div class="row" style="justify-content:center"><button class="secondary" data-action="remove-water">−</button><button class="primary" data-action="add-water">+ 1 copo</button><button class="secondary" data-action="reset-water">Zerar</button></div></div>`;}
-function addWater(){state.data.agua=Math.max(0,Number(state.data.agua||0)+1);persist();render();toast("Copo de água registrado.");}
-function removeWater(){state.data.agua=Math.max(0,Number(state.data.agua||0)-1);persist();render();}
-function resetWater(){state.data.agua=0;persist();render();toast("Contador de água zerado.");}
+        <div class="topbar-actions">
 
-function financePage(){
-  const r=state.data.fin.receitas,d=state.data.fin.despesas;
-  const tr=r.reduce((s,x)=>s+num(x.value),0),td=d.reduce((s,x)=>s+num(x.value),0),saldo=tr-td;
-  const all=[...r.map(x=>({...x,type:"receita"})),...d.map(x=>({...x,type:"despesa"}))].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
-  return`<div class="page-header"><div><div class="eyebrow">Organização financeira</div><h1>Finanças</h1><p class="muted">Registre suas entradas e saídas.</p></div><div class="row"><button class="primary" data-action="add-income">+ Receita</button><button class="secondary" data-action="add-expense">+ Despesa</button></div></div><div class="stat-grid">${stat(money(tr),"Receitas")}${stat(money(td),"Despesas")}${stat(money(saldo),"Saldo")}</div><div class="stack">${all.length?all.map(financeCard).join(""):emptyState("Nenhuma movimentação registrada.","Adicionar receita","add-income")}</div>`;
-}
-function financeCard(x){const pos=x.type==="receita";return`<div class="card item-row"><div class="ico">${pos?"↗":"↘"}</div><div style="flex:1"><b>${esc(x.title)}</b><div class="muted">${formatDate(x.date)}</div></div><strong>${pos?"+":"-"}${money(x.value)}</strong><button class="icon-btn" data-action="delete-finance" data-type="${x.type}" data-id="${x.id}">🗑</button></div>`;}
-function addIncome(){const t=prompt("Descrição da receita:");if(!t?.trim())return;const v=num(prompt("Valor da receita:"));if(v<=0){toast("Digite um valor válido.");return;}state.data.fin.receitas.push({id:uid("income"),title:t.trim(),value:v,date:today()});persist();render();toast("Receita adicionada.");}
-function addExpense(){const t=prompt("Descrição da despesa:");if(!t?.trim())return;const v=num(prompt("Valor da despesa:"));if(v<=0){toast("Digite um valor válido.");return;}state.data.fin.despesas.push({id:uid("expense"),title:t.trim(),value:v,date:today()});persist();render();toast("Despesa adicionada.");}
-function deleteFinance(type,id){const c=type==="receita"?"receitas":"despesas";state.data.fin[c]=state.data.fin[c].filter(x=>x.id!==id);persist();render();toast("Movimentação removida.");}
+          <button
+            class="icon-button"
+            data-action="quick-add"
+            title="Adicionar"
+          >
+            ${icon("plus")}
+          </button>
 
-function goalsPage(){const a=state.data.objetivos;return`<div class="page-header"><div><div class="eyebrow">Planejamento</div><h1>Objetivos</h1><p class="muted">Transforme planos em metas acompanháveis.</p></div><button class="primary" data-action="add-goal">+ Objetivo</button></div><div class="stack">${a.length?a.map(goalCard).join(""):emptyState("Você ainda não cadastrou objetivos.","Criar objetivo","add-goal")}</div>`;}
-function goalCard(x){const p=Math.max(0,Math.min(100,num(x.progress)));return`<div class="card"><div class="row"><div><h3>${esc(x.title)}</h3>${x.deadline?`<small class="muted">Prazo: ${formatDate(x.deadline)}</small>`:""}</div><strong>${p}%</strong></div><div style="height:10px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:16px 0"><div style="width:${p}%;height:100%;background:linear-gradient(90deg,#6c5ce7,#27d7ff);border-radius:99px"></div></div><div class="row"><button class="secondary" data-action="update-goal" data-id="${x.id}">Atualizar</button><button class="icon-btn" data-action="delete-goal" data-id="${x.id}">🗑</button></div></div>`;}
-function addGoal(){const t=prompt("Qual é o seu objetivo?");if(!t?.trim())return;state.data.objetivos.push({id:uid("goal"),title:t.trim(),deadline:prompt("Prazo (AAAA-MM-DD), opcional:","")||"",progress:0});persist();render();toast("Objetivo criado.");}
-function updateGoal(id){const x=state.data.objetivos.find(x=>x.id===id);if(!x)return;x.progress=Math.max(0,Math.min(100,num(prompt("Progresso de 0 a 100:",String(x.progress||0)))));persist();render();toast("Objetivo atualizado.");}
-function deleteGoal(id){state.data.objetivos=state.data.objetivos.filter(x=>x.id!==id);persist();render();toast("Objetivo removido.");}
+          <button
+            class="avatar"
+            data-page="perfil"
+          >
+            ${
+              state.user.photo
+                ? `<img src="${esc(state.user.photo)}" alt="Foto de perfil">`
+                : esc(
+                    (state.user.name || "A")
+                      .charAt(0)
+                      .toUpperCase()
+                  )
+            }
+          </button>
 
-function familyPage(){const a=state.data.familia;return`<div class="page-header"><div><div class="eyebrow">Compartilhamento</div><h1>Família</h1><p class="muted">Organize a rotina junto com quem importa.</p></div><button class="primary" data-action="add-family">+ Pessoa</button></div><div class="card"><p class="muted">Nesta versão do MVP, os membros são registrados localmente. O compartilhamento entre contas será conectado ao D1 na próxima etapa.</p></div><div class="stack">${a.length?a.map(familyCard).join(""):emptyState("Nenhum membro adicionado.","Adicionar pessoa","add-family")}</div>`;}
-function familyCard(x){return`<div class="card item-row"><div class="ico">👤</div><div style="flex:1"><b>${esc(x.name)}</b><div class="muted">${esc(x.email)}</div></div><button class="icon-btn" data-action="delete-family" data-id="${x.id}">🗑</button></div>`;}
-function addFamily(){const n=prompt("Nome da pessoa:");if(!n?.trim())return;state.data.familia.push({id:uid("family"),name:n.trim(),email:prompt("E-mail (opcional):","")||""});persist();render();toast("Pessoa adicionada.");}
-function deleteFamily(id){state.data.familia=state.data.familia.filter(x=>x.id!==id);persist();render();toast("Pessoa removida.");}
+        </div>
 
-function renderAssistant(){
-  return`<div class="page-header"><div><div class="eyebrow">Seu Copiloto</div><h1>Assistente LiDire</h1><p class="muted">Organize sua vida conversando com a LiDire.</p></div></div>
-  <div class="card"><div class="assistant-message"><span class="ico">✦</span><div><b>LiDire</b><p class="muted">Olá! Ainda estou na versão inicial, mas já posso ajudar você a consultar sua rotina.</p></div></div>
-  <div class="stack" style="margin-top:20px"><button class="item" data-action="assistant-suggestion" data-message="O que tenho para fazer hoje?">📅<span style="flex:1;text-align:left">O que tenho para fazer hoje?</span>›</button><button class="item" data-action="assistant-suggestion" data-message="Como está minha rotina?">✦<span style="flex:1;text-align:left">Como está minha rotina?</span>›</button><button class="item" data-action="assistant-suggestion" data-message="Tenho tarefas pendentes?">✓<span style="flex:1;text-align:left">Tenho tarefas pendentes?</span>›</button></div>
-  <div style="display:flex;gap:10px;margin-top:20px"><input id="assistantInput" type="text" placeholder="Digite sua pergunta..." style="flex:1;min-width:0;padding:13px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:white"><button class="primary" data-action="assistant-send">Enviar</button></div><div id="assistantResponse" style="margin-top:18px"></div></div>`;
-}
-function assistantAnswer(m){
-  const t=String(m||"").toLowerCase(),tasks=state.data.tarefas.filter(x=>!x.done),comps=state.data.compromissos.filter(x=>!x.date||x.date===today()),studies=state.data.estudos.filter(x=>!x.done);
-  if(t.includes("tarefa")||t.includes("fazer"))return tasks.length?`Você tem <b>${tasks.length}</b> tarefa(s) pendente(s):<br><br>${tasks.slice(0,5).map(x=>"• "+esc(x.title)).join("<br>")}`:"Você não tem tarefas pendentes no momento.";
-  if(t.includes("hoje")||t.includes("compromisso")||t.includes("agenda"))return comps.length?`Você tem <b>${comps.length}</b> compromisso(s):<br><br>${comps.slice(0,5).map(x=>"• "+esc(x.title)+(x.time?" — "+esc(x.time):"")).join("<br>")}`:"Você não possui compromissos registrados para hoje.";
-  if(t.includes("estudo")||t.includes("estudar"))return studies.length?`Você tem <b>${studies.length}</b> atividade(s) de estudo pendente(s).`:"Não há estudos pendentes registrados.";
-  return`Posso ajudar você a consultar sua rotina. Experimente perguntar sobre <b>tarefas</b>, <b>compromissos</b> ou <b>estudos</b>.`;
-}
-function sendAssistant(message){
-  const input=document.getElementById("assistantInput"),response=document.getElementById("assistantResponse"),value=String(message||input?.value||"").trim();
-  if(!value)return;if(input)input.value="";
-  if(response)response.innerHTML=`<div class="card"><div class="muted">Você</div><p>${esc(value)}</p><hr style="border:0;border-top:1px solid rgba(255,255,255,.08)"><div class="muted">LiDire</div><p>${assistantAnswer(value)}</p></div>`;
+      </header>
+
+      <main class="main-content">
+        ${content}
+      </main>
+
+      <nav class="bottom-nav">
+
+        ${nav
+          .map(
+            ([id, ico, label]) => `
+              <button
+                class="nav-item ${
+                  currentPage === id ? "active" : ""
+                }"
+                data-page="${id}"
+              >
+                <span>${ico}</span>
+                <small>${label}</small>
+              </button>
+            `
+          )
+          .join("")}
+
+      </nav>
+
+    </div>
+  `;
 }
 
-function explore(){
-  return`<div class="page-header"><div><div class="eyebrow">Tudo em um só lugar</div><h1>Explorar</h1><p class="muted">Conheça os recursos da LiDire.</p></div></div><div class="stack">${Object.keys(modules).map(k=>{const x=modules[k];return`<button class="item" data-page="${k}"><span class="ico">${x[0]}</span><span style="flex:1;text-align:left"><b>${x[1]}</b><br><small class="muted">${x[2]}</small></span><span>›</span></button>`}).join("")}</div>`;
+function pageHeader(
+  eyebrow,
+  title,
+  subtitle = "",
+  action = ""
+) {
+  return `
+    <div class="page-header">
+
+      <div>
+
+        <div class="eyebrow">
+          ${esc(eyebrow)}
+        </div>
+
+        <h1>
+          ${esc(title)}
+        </h1>
+
+        ${
+          subtitle
+            ? `<p>${esc(subtitle)}</p>`
+            : ""
+        }
+
+      </div>
+
+      ${action}
+
+    </div>
+  `;
 }
 
-function profile(){
-  return`<div class="page-header"><div><div class="eyebrow">Minha conta</div><h1>Perfil</h1><p class="muted">Seus dados pessoais.</p></div></div>
-  <div class="card"><div class="profile-avatar">${esc(String(state.user.name||"A").charAt(0).toUpperCase())}</div><h2>${esc(state.user.name)}</h2><p class="muted">${esc(state.user.email)}</p>${state.user.phone?`<p class="muted">${esc(state.user.phone)}</p>`:""}<button class="primary" data-action="edit-profile">Editar perfil</button></div>
-  <div class="stack"><button class="item" data-page="familia">👨‍👩‍👧<span style="flex:1;text-align:left"><b>Família</b><br><small class="muted">Pessoas e compartilhamento</small></span>›</button><button class="item" data-action="clear-local">🗑<span style="flex:1;text-align:left"><b>Limpar dados locais</b><br><small class="muted">Apaga os dados salvos neste dispositivo</small></span>›</button></div>`;
-}
-function editProfile(){
-  const n=prompt("Seu nome:",state.user.name);if(!n?.trim())return;
-  state.user.name=n.trim();state.user.email=(prompt("Seu e-mail:",state.user.email||"")||"").trim();state.user.phone=(prompt("Telefone:",state.user.phone||"")||"").trim();
-  persist();render();toast("Perfil atualizado.");
-}
-function clearLocal(){
-  if(!confirm("Isso apagará os dados salvos neste navegador. Continuar?"))return;
-  localStorage.removeItem(STORAGE_KEY);Object.assign(state,JSON.parse(JSON.stringify(initialState)));render();toast("Dados locais apagados.");
+function statCard(value, label, tone = "") {
+  return `
+    <div class="stat-card ${tone}">
+      <strong>${esc(value)}</strong>
+      <span>${esc(label)}</span>
+    </div>
+  `;
 }
 
-function modulePage(page){
-  switch(page){
-    case"tarefas":return tasksPage();
-    case"compras":return shoppingPage();
-    case"estudos":return studiesPage();
-    case"treinos":return workoutsPage();
-    case"hidratacao":return hydrationPage();
-    case"financas":return financePage();
-    case"objetivos":return goalsPage();
-    case"familia":return familyPage();
-    default:return`<div class="card"><h1>Página não encontrada</h1><button class="primary" data-page="inicio">Voltar ao início</button></div>`;
+function emptyState(
+  title,
+  text,
+  actionLabel,
+  action
+) {
+  return `
+    <div class="empty-state">
+
+      <div class="empty-orb">
+        ✦
+      </div>
+
+      <h3>
+        ${esc(title)}
+      </h3>
+
+      <p>
+        ${esc(text)}
+      </p>
+
+      <button
+        class="primary-button"
+        data-action="${esc(action)}"
+      >
+        ${icon("plus")}
+        ${esc(actionLabel)}
+      </button>
+
+    </div>
+  `;
+}
+
+function field(
+  label,
+  name,
+  type = "text",
+  value = "",
+  extra = ""
+) {
+  return `
+    <label class="form-field">
+
+      <span>
+        ${esc(label)}
+      </span>
+
+      <input
+        name="${esc(name)}"
+        type="${esc(type)}"
+        value="${esc(value)}"
+        ${extra}
+      >
+
+    </label>
+  `;
+}
+
+function selectField(
+  label,
+  name,
+  options,
+  selected = ""
+) {
+  return `
+    <label class="form-field">
+
+      <span>
+        ${esc(label)}
+      </span>
+
+      <select name="${esc(name)}">
+
+        ${options
+          .map(
+            (option) => `
+              <option
+                value="${esc(option.value)}"
+                ${
+                  String(option.value) ===
+                  String(selected)
+                    ? "selected"
+                    : ""
+                }
+              >
+                ${esc(option.label)}
+              </option>
+            `
+          )
+          .join("")}
+
+      </select>
+
+    </label>
+  `;
+      }
+
+function home() {
+  const pending = state.data.tarefas.filter(
+    (x) => !x.done
+  ).length;
+
+  const commitments =
+    state.data.compromissos.filter(
+      (x) => x.date === todayISO()
+    ).length;
+
+  const goals = state.data.objetivos.length;
+
+  const firstName = (
+    state.user.name || "você"
+  ).split(" ")[0];
+
+  return appShell(`
+    <section class="hero-card">
+
+      <div class="hero-glow"></div>
+
+      <div class="hero-copy">
+
+        <span class="pill">
+          <span class="pulse-dot"></span>
+          Seu copiloto para a vida
+        </span>
+
+        <h1>
+          Olá, ${esc(firstName)}.<br>
+          <span>Vamos organizar seu dia?</span>
+        </h1>
+
+        <p>
+          A LiDire reúne sua rotina em um só lugar
+          para você saber o que importa agora.
+        </p>
+
+        <div class="hero-actions">
+
+          <button
+            class="primary-button"
+            data-action="quick-add"
+          >
+            ${icon("plus")}
+            Adicionar
+          </button>
+
+          <button
+            class="ghost-button"
+            data-page="explorar"
+          >
+            Explorar LiDire
+            ${icon("arrow")}
+          </button>
+
+        </div>
+
+      </div>
+
+      <div class="hero-orbit">
+
+        <div class="orbit-center">
+
+          <img
+            src="/logo-lidire-oficial.png"
+            alt="LiDire"
+          >
+
+        </div>
+
+        <span>Agenda</span>
+        <span>Tarefas</span>
+        <span>Metas</span>
+        <span>Você</span>
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="section-title">
+
+        <div>
+          <span class="eyebrow">
+            RESUMO
+          </span>
+
+          <h2>
+            Seu dia em números
+          </h2>
+        </div>
+
+      </div>
+
+      <div class="stats-grid">
+
+        ${statCard(
+          commitments,
+          "Hoje na agenda",
+          "purple"
+        )}
+
+        ${statCard(
+          pending,
+          "Tarefas pendentes",
+          "cyan"
+        )}
+
+        ${statCard(
+          goals,
+          "Objetivos ativos",
+          "pink"
+        )}
+
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="section-title">
+
+        <div>
+          <span class="eyebrow">
+            CENTRAL
+          </span>
+
+          <h2>
+            O que você quer organizar?
+          </h2>
+        </div>
+
+        <button
+          class="text-button"
+          data-page="explorar"
+        >
+          Ver tudo ${icon("arrow")}
+        </button>
+
+      </div>
+
+      <div class="module-grid">
+        ${modules
+          .slice(0, 6)
+          .map(moduleCard)
+          .join("")}
+      </div>
+
+    </section>
+
+    <section class="assistant-banner">
+
+      <div class="assistant-symbol">
+        ✦
+      </div>
+
+      <div>
+
+        <span class="eyebrow">
+          ASSISTENTE LIDIRE
+        </span>
+
+        <h3>
+          Precisa de ajuda para decidir
+          o próximo passo?
+        </h3>
+
+        <p>
+          Converse com sua rotina e encontre
+          o que precisa fazer agora.
+        </p>
+
+      </div>
+
+      <button
+        class="primary-button"
+        data-page="assistente"
+      >
+        Conversar ${icon("arrow")}
+      </button>
+
+    </section>
+  `);
+}
+
+function moduleCard([
+  id,
+  title,
+  desc,
+  ico,
+  page
+]) {
+  const count = countFor(id);
+
+  return `
+    <button
+      class="module-card"
+      data-page="${page}"
+    >
+
+      <span class="module-icon">
+        ${icon(ico)}
+      </span>
+
+      <span class="module-content">
+
+        <strong>
+          ${esc(title)}
+        </strong>
+
+        <small>
+          ${esc(desc)}
+        </small>
+
+      </span>
+
+      <span class="module-count">
+        ${count}
+      </span>
+
+      <span class="module-arrow">
+        ${icon("arrow")}
+      </span>
+
+    </button>
+  `;
+}
+
+function countFor(id) {
+  if (id === "tarefas") {
+    return state.data.tarefas.filter(
+      (x) => !x.done
+    ).length;
   }
+
+  if (id === "agenda") {
+    return state.data.compromissos.length;
+  }
+
+  if (id === "compras") {
+    return state.data.compras.reduce(
+      (total, lista) =>
+        total +
+        (lista.items || []).filter(
+          (x) => !x.done
+        ).length,
+      0
+    );
+  }
+
+  return state.data[id]?.length || 0;
 }
 
-document.addEventListener("click",event=>{
-  const pageEl=event.target.closest("[data-page]");
-  if(pageEl?.dataset.page){event.preventDefault();go(pageEl.dataset.page);return;}
-  const b=event.target.closest("[data-action]");
-  if(!b)return;
-  const a=b.dataset.action,id=b.dataset.id;
-  switch(a){
-    case"notifications":toast("As notificações serão conectadas na próxima etapa.");break;
-    case"reload":location.reload();break;
-    case"add-commitment":addCommitment();break;
-    case"edit-commitment":editCommitment(id);break;
-    case"delete-commitment":deleteCommitment(id);break;
-    case"add-task":addTask();break;
-    case"toggle-task":toggleTask(id);break;
-    case"edit-task":editTask(id);break;
-    case"delete-task":deleteTask(id);break;
-    case"add-shopping":addShopping();break;
-    case"toggle-shopping":toggleShopping(id);break;
-    case"delete-shopping":deleteShopping(id);break;
-    case"add-study":addStudy();break;
-    case"toggle-study":toggleStudy(id);break;
-    case"delete-study":deleteStudy(id);break;
-    case"add-workout":addWorkout();break;
-    case"delete-workout":deleteWorkout(id);break;
-    case"add-water":addWater();break;
-    case"remove-water":removeWater();break;
-    case"reset-water":resetWater();break;
-    case"add-income":addIncome();break;
-    case"add-expense":addExpense();break;
-    case"delete-finance":deleteFinance(b.dataset.type,id);break;
-    case"add-goal":addGoal();break;
-    case"update-goal":updateGoal(id);break;
-    case"delete-goal":deleteGoal(id);break;
-    case"add-family":addFamily();break;
-    case"delete-family":deleteFamily(id);break;
-    case"edit-profile":editProfile();break;
-    case"clear-local":clearLocal();break;
-    case"assistant-suggestion":sendAssistant(b.dataset.message);break;
-    case"assistant-send":sendAssistant();break;
+function listPage(config) {
+  const items =
+    state.data[config.key] || [];
+
+  return appShell(`
+    ${pageHeader(
+      config.eyebrow || "ORGANIZAÇÃO",
+      config.title,
+      config.subtitle,
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-${config.key}"
+        >
+          ${icon("plus")}
+          Adicionar
+        </button>
+      `
+    )}
+
+    ${
+      config.stats
+        ? `
+          <div class="stats-grid mini">
+            ${config.stats()}
+          </div>
+        `
+        : ""
+    }
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          ${items.length}
+          ${items.length === 1 ? "item" : "itens"}
+        </div>
+
+        <div class="toolbar-filter">
+          ${config.filter || ""}
+        </div>
+
+      </div>
+
+      ${
+        items.length
+          ? `
+            <div class="item-list">
+              ${items
+                .map(config.render)
+                .join("")}
+            </div>
+          `
+          : emptyState(
+              config.emptyTitle ||
+                "Nada por aqui ainda",
+              config.emptyText ||
+                "Adicione seu primeiro item para começar.",
+              "Adicionar",
+              `add-${config.key}`
+            )
+      }
+
+    </div>
+  `);
+}
+
+function agenda() {
+  const items = [
+    ...state.data.compromissos
+  ].sort((a, b) => {
+    const dateA = `${a.date || ""} ${
+      a.time || ""
+    }`;
+
+    const dateB = `${b.date || ""} ${
+      b.time || ""
+    }`;
+
+    return dateA.localeCompare(dateB);
+  });
+
+  return listPage({
+    key: "compromissos",
+
+    title: "Agenda",
+
+    subtitle:
+      "Seus compromissos organizados em um só lugar.",
+
+    eyebrow: "SUA ROTINA",
+
+    emptyTitle:
+      "Sua agenda está livre",
+
+    emptyText:
+      "Cadastre compromissos, consultas, reuniões e outros horários.",
+
+    render: (x) => `
+      <div class="list-item">
+
+        <div class="date-badge">
+
+          <strong>
+            ${
+              x.date
+                ? x.date.slice(8, 10)
+                : "--"
+            }
+          </strong>
+
+          <small>
+            ${
+              x.date
+                ? new Date(
+                    `${x.date}T12:00:00`
+                  )
+                    .toLocaleDateString(
+                      "pt-BR",
+                      { month: "short" }
+                    )
+                    .replace(".", "")
+                : ""
+            }
+          </small>
+
+        </div>
+
+        <div class="item-main">
+
+          <strong>
+            ${esc(x.title)}
+          </strong>
+
+          <span>
+            ${
+              x.time
+                ? `${icon("clock")} ${esc(
+                    x.time
+                  )}`
+                : "Sem horário"
+            }
+
+            ${
+              x.location
+                ? ` · ${esc(x.location)}`
+                : ""
+            }
+          </span>
+
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            data-action="edit-compromisso"
+            data-id="${x.id}"
+          >
+            ${icon("edit")}
+          </button>
+
+          <button
+            data-action="delete-compromisso"
+            data-id="${x.id}"
+          >
+            ${icon("trash")}
+          </button>
+
+        </div>
+
+      </div>
+    `
+  });
+}
+
+function tarefas() {
+  return listPage({
+    key: "tarefas",
+
+    title: "Tarefas",
+
+    subtitle:
+      "Tire as coisas da cabeça e coloque em movimento.",
+
+    eyebrow: "FAZER",
+
+    stats: () => {
+      const all =
+        state.data.tarefas.length;
+
+      const done =
+        state.data.tarefas.filter(
+          (x) => x.done
+        ).length;
+
+      return `
+        ${statCard(
+          done,
+          "Concluídas",
+          "cyan"
+        )}
+
+        ${statCard(
+          all - done,
+          "Pendentes",
+          "purple"
+        )}
+
+        ${statCard(
+          all
+            ? Math.round(
+                (done / all) * 100
+              ) + "%"
+            : "0%",
+          "Progresso",
+          "pink"
+        )}
+      `;
+    },
+
+    emptyTitle:
+      "Nenhuma tarefa criada",
+
+    render: (x) => `
+      <div class="list-item ${
+        x.done ? "completed" : ""
+      }">
+
+        <button
+          class="check-button ${
+            x.done ? "checked" : ""
+          }"
+          data-action="toggle-tarefa"
+          data-id="${x.id}"
+        >
+          ${x.done ? "✓" : ""}
+        </button>
+
+        <div class="item-main">
+
+          <strong>
+            ${esc(x.title)}
+          </strong>
+
+          <span>
+            ${
+              x.priority
+                ? `Prioridade: ${esc(
+                    x.priority
+                  )}`
+                : "Sem prioridade"
+            }
+
+            ${
+              x.date
+                ? ` · ${dateBR(x.date)}`
+                : ""
+            }
+          </span>
+
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            data-action="edit-tarefa"
+            data-id="${x.id}"
+          >
+            ${icon("edit")}
+          </button>
+
+          <button
+            data-action="delete-tarefa"
+            data-id="${x.id}"
+          >
+            ${icon("trash")}
+          </button>
+
+        </div>
+
+      </div>
+    `
+  });
+}
+
+function compras() {
+  const listas =
+    state.data.compras || [];
+
+  return appShell(`
+    ${pageHeader(
+      "LISTAS",
+      "Compras",
+      "Organize suas compras em listas diferentes.",
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-lista-compras"
+        >
+          ${icon("plus")}
+          Nova lista
+        </button>
+      `
+    )}
+
+    <div class="shopping-lists">
+
+      ${
+        listas.length
+          ? listas
+              .map((lista) => {
+                const total =
+                  lista.items?.length || 0;
+
+                const done =
+                  lista.items?.filter(
+                    (item) => item.done
+                  ).length || 0;
+
+                return `
+                  <div class="shopping-list-card">
+
+                    <button
+                      class="shopping-list-main"
+                      data-action="open-lista-compras"
+                      data-id="${lista.id}"
+                    >
+
+                      <div class="shopping-list-icon">
+                        🛒
+                      </div>
+
+                      <div class="shopping-list-info">
+
+                        <strong>
+                          ${esc(lista.name)}
+                        </strong>
+
+                        <span>
+                          ${total}
+                          ${
+                            total === 1
+                              ? "item"
+                              : "itens"
+                          }
+
+                          ·
+
+                          ${done}
+                          ${
+                            done === 1
+                              ? "concluído"
+                              : "concluídos"
+                          }
+                        </span>
+
+                      </div>
+
+                      <span class="module-arrow">
+                        ${icon("arrow")}
+                      </span>
+
+                    </button>
+
+                    <button
+                      class="shopping-list-delete"
+                      data-action="delete-lista-compras"
+                      data-id="${lista.id}"
+                      title="Excluir lista"
+                    >
+                      ${icon("trash")}
+                    </button>
+
+                  </div>
+                `;
+              })
+              .join("")
+          : `
+            <div class="content-card">
+
+              ${emptyState(
+                "Nenhuma lista criada",
+                "Crie sua primeira lista de compras para começar a organizar seus itens.",
+                "Criar lista",
+                "add-lista-compras"
+              )}
+
+            </div>
+          `
+      }
+
+    </div>
+  `);
+}
+
+function listaCompras(id) {
+  const lista =
+    state.data.compras.find(
+      (x) => x.id === id
+    );
+
+  if (!lista) {
+    currentPage = "compras";
+    currentShoppingList = null;
+    render();
+    return;
   }
-});
 
-document.addEventListener("keydown",event=>{
-  if(event.key==="Enter"&&event.target?.id==="assistantInput"){event.preventDefault();sendAssistant();}
-});
+  const items =
+    lista.items || [];
 
-window.LiDire={state,go,render,persist,addTask,addCommitment,addShopping,addStudy,addWorkout,addWater,addIncome,addExpense,addGoal,addFamily,sendAssistant};
+  const done =
+    items.filter(
+      (x) => x.done
+    ).length;
 
-function initLiDire(){loadLocal();render();console.log("LiDire MVP inicializado.");}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initLiDire);else initLiDire();
+  return appShell(`
+    <div class="shopping-back">
 
+      <button
+        class="text-button"
+        data-action="back-compras"
+      >
+        ${icon("back")}
+        Voltar para compras
+      </button>
+
+    </div>
+
+    ${pageHeader(
+      "LISTA DE COMPRAS",
+      lista.name,
+      `${items.length} ${
+        items.length === 1
+          ? "item"
+          : "itens"
+      } · ${done} concluído${
+        done === 1 ? "" : "s"
+      }`,
+      `
+        <button
+          class="primary-button compact"
+          data-action="add-item-compra"
+          data-id="${lista.id}"
+        >
+          ${icon("plus")}
+          Adicionar item
+        </button>
+      `
+    )}
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          ${done}/${items.length}
+          concluídos
+        </div>
+
+      </div>
+
+      ${
+        items.length
+          ? `
+            <div class="item-list">
+
+              ${items
+                .map(
+                  (item) => `
+                    <div class="list-item ${
+                      item.done
+                        ? "completed"
+                        : ""
+                    }">
+
+                      <button
+                        class="check-button ${
+                          item.done
+                            ? "checked"
+                            : ""
+                        }"
+                        data-action="toggle-item-compra"
+                        data-list-id="${lista.id}"
+                        data-id="${item.id}"
+                      >
+                        ${
+                          item.done
+                            ? "✓"
+                            : ""
+                        }
+                      </button>
+
+                      <div class="item-main">
+
+                        <strong>
+                          ${esc(item.name)}
+                        </strong>
+
+                        <span>
+
+                          ${
+                            item.quantity
+                              ? esc(
+                                  item.quantity
+                                )
+                              : ""
+                          }
+
+                          ${
+                            item.category
+                              ? ` · ${esc(
+                                  item.category
+                                )}`
+                              : ""
+                          }
+
+                        </span>
+
+                      </div>
+
+                      <div class="item-actions">
+
+                        <button
+                          data-action="edit-item-compra"
+                          data-list-id="${lista.id}"
+                          data-id="${item.id}"
+                        >
+                          ${icon("edit")}
+                        </button>
+
+                        <button
+                          data-action="delete-item-compra"
+                          data-list-id="${lista.id}"
+                          data-id="${item.id}"
+                        >
+                          ${icon("trash")}
+                        </button>
+
+                      </div>
+
+                    </div>
+                  `
+                )
+                .join("")}
+
+            </div>
+          `
+          : `
+            <div class="empty-state">
+
+              <div class="empty-orb">
+                🛒
+              </div>
+
+              <h3>
+                Lista vazia
+              </h3>
+
+              <p>
+                Adicione o primeiro item desta lista.
+              </p>
+
+              <button
+                class="primary-button"
+                data-action="add-item-compra"
+                data-id="${lista.id}"
+              >
+                ${icon("plus")}
+                Adicionar item
+              </button>
+
+            </div>
+          `
+      }
+
+    </div>
+  `);
+}
+
+function estudos() {
+  return listPage({
+    key: "estudos",
+
+    title: "Estudos",
+
+    subtitle:
+      "Acompanhe matérias, sessões e seu progresso.",
+
+    eyebrow: "APRENDIZADO",
+
+    render: (x) => `
+      <div class="list-item ${
+        x.done ? "completed" : ""
+      }">
+
+        <button
+          class="check-button ${
+            x.done ? "checked" : ""
+          }"
+          data-action="toggle-estudo"
+          data-id="${x.id}"
+        >
+          ${x.done ? "✓" : ""}
+        </button>
+
+        <div class="item-main">
+
+          <strong>
+            ${esc(x.subject)}
+          </strong>
+
+          <span>
+
+            ${
+              x.topic
+                ? esc(x.topic)
+                : "Sessão de estudo"
+            }
+
+            ${
+              x.duration
+                ? ` · ${esc(
+                    x.duration
+                  )} min`
+                : ""
+            }
+
+          </span>
+
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            data-action="edit-estudo"
+            data-id="${x.id}"
+          >
+            ${icon("edit")}
+          </button>
+
+          <button
+            data-action="delete-estudo"
+            data-id="${x.id}"
+          >
+            ${icon("trash")}
+          </button>
+
+        </div>
+
+      </div>
+    `
+  });
+}
+
+function treinos() {
+  return listPage({
+    key: "treinos",
+
+    title: "Treinos",
+
+    subtitle:
+      "Registre seus movimentos e mantenha constância.",
+
+    eyebrow: "BEM-ESTAR",
+
+    render: (x) => `
+      <div class="list-item">
+
+        <div class="module-icon small">
+          ♢
+        </div>
+
+        <div class="item-main">
+
+          <strong>
+            ${esc(x.name)}
+          </strong>
+
+          <span>
+
+            ${esc(x.type || "Treino")}
+
+            ${
+              x.duration
+                ? ` · ${esc(
+                    x.duration
+                  )} min`
+                : ""
+            }
+
+          </span>
+
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            data-action="edit-treino"
+            data-id="${x.id}"
+          >
+            ${icon("edit")}
+          </button>
+
+          <button
+            data-action="delete-treino"
+            data-id="${x.id}"
+          >
+            ${icon("trash")}
+          </button>
+
+        </div>
+
+      </div>
+    `
+  });
+}
 
 /* =========================================================
-   LiDire MVP V3
-   Mantém o armazenamento local da V2 e amplia os módulos.
-   O Worker/D1 não é alterado por este arquivo.
+   HIDRATAÇÃO
    ========================================================= */
 
-const LIDIRE_V3 = "lidore-mvp-versao-3";
-
-function v3FinanceTransactions() {
-  const fin = state.data.fin || {receitas:[], despesas:[]};
-  return [
-    ...(fin.receitas || []).map(x => ({...x, type:"receita"})),
-    ...(fin.despesas || []).map(x => ({...x, type:"despesa"}))
-  ];
+function getHydrationTotalToday() {
+  return state.data.hidratacao
+    .filter((x) => {
+      return String(x.createdAt || "").slice(
+        0,
+        10
+      ) === todayISO();
+    })
+    .reduce(
+      (sum, x) =>
+        sum + Number(x.amount || 0),
+      0
+    );
 }
 
-function v3Normalize() {
-  if (!state.settings) state.settings = {};
-  state.settings.financeLimit = Number(state.settings.financeLimit || 0);
-  state.settings.financeWarning = Number(state.settings.financeWarning || 80);
-  state.settings.hydrationReminder = !!state.settings.hydrationReminder;
-  state.settings.hydrationInterval = Number(state.settings.hydrationInterval || 60);
+function getHydrationDailyGoal() {
+  const config =
+    state.data.hidratacaoConfig;
 
-  if (!Array.isArray(state.data.comprasListas)) {
-    const old = Array.isArray(state.data.compras) ? state.data.compras : [];
-    state.data.comprasListas = [{
-      id: uid("lista"), name: "Lista principal",
-      items: old.map(x => ({id:x.id || uid("item"), name:x.title || x.name || "", quantity:x.quantity || "", done:!!x.done}))
-    }];
+  const amount =
+    Number(config.amountPerPeriod || 0);
+
+  const start = timeToMinutes(
+    config.startTime
+  );
+
+  const end = timeToMinutes(
+    config.endTime
+  );
+
+  const interval =
+    Number(config.intervalMinutes || 0);
+
+  if (
+    !amount ||
+    !interval ||
+    end <= start
+  ) {
+    return amount;
   }
-  if (!Array.isArray(state.data.estudos)) state.data.estudos = [];
-  state.data.estudos.forEach(x => {
-    if (!x.subject) x.subject = x.title || "Matéria";
-    if (!Array.isArray(x.references)) x.references = [];
-    if (!("notes" in x)) x.notes = "";
-  });
-  if (!Array.isArray(state.data.treinos)) state.data.treinos = [];
-  state.data.treinos.forEach(x => {
-    if (!Array.isArray(x.exercises)) x.exercises = [];
-    if (!("time" in x)) x.time = "";
-    if (!("video" in x)) x.video = "";
-  });
-  if (!Array.isArray(state.data.hidratacao)) {
-    const cups = Number(state.data.agua || 0);
-    state.data.hidratacao = Array.from({length:cups}, (_,i)=>({
-      id:uid("agua"), amount:250, date:today(), time:""
-    }));
-  }
-  if (!Array.isArray(state.data.financas)) {
-    state.data.financas = v3FinanceTransactions();
-  }
+
+  const periods =
+    Math.floor(
+      (end - start) / interval
+    ) + 1;
+
+  return amount * periods;
 }
-v3Normalize();
-persist();
 
-function v3Home() {
-  const name = String(state.user?.name || "Alice").split(" ")[0];
-  const tasks = state.data.tarefas.filter(x=>!x.done).length;
-  const commitments = state.data.compromissos.filter(x=>x.date===today()).length;
-  const studies = state.data.estudos.filter(x=>!x.done).length;
-  const shopping = state.data.comprasListas.reduce((n,l)=>n+(l.items||[]).filter(x=>!x.done).length,0);
-  const events = state.data.compromissos.filter(x=>x.date===today()).sort((a,b)=>String(a.time||"").localeCompare(String(b.time||"")));
-  const conflicts = v3AgendaConflicts();
-  const fs = v3FinanceStatus();
+function timeToMinutes(time) {
+  if (!time) return 0;
 
-  return layout(`
-    <section class="v3-home-hero">
-      <div class="v3-eyebrow">SEU COPILOTO PARA A VIDA</div>
-      <h1>Olá,<br><span>${esc(name)}!</span> ☀️</h1>
-      <p>Aqui está um resumo da sua rotina.<br>Vamos organizar o que importa?</p>
-      <div class="stat-grid">
-        ${stat(tasks,"Tarefas pendentes")}
-        ${stat(commitments,"Compromissos hoje")}
-        ${stat(studies,"Estudos pendentes")}
-        ${stat(shopping,"Itens para comprar")}
+  const [hours, minutes] =
+    time.split(":").map(Number);
+
+  return (
+    Number(hours || 0) * 60 +
+    Number(minutes || 0)
+  );
+}
+
+function hidratacao() {
+  const total =
+    getHydrationTotalToday();
+
+  const goal =
+    getHydrationDailyGoal();
+
+  const pct = goal
+    ? Math.min(
+        100,
+        Math.round(
+          (total / goal) * 100
+        )
+      )
+    : 0;
+
+  const config =
+    state.data.hidratacaoConfig;
+
+  const records =
+    state.data.hidratacao.filter(
+      (x) =>
+        String(
+          x.createdAt || ""
+        ).slice(0, 10) === todayISO()
+    );
+
+  return appShell(`
+    ${pageHeader(
+      "BEM-ESTAR",
+      "Hidratação",
+      "Defina sua rotina de água e acompanhe o consumo.",
+      `
+        <div class="page-header-actions">
+
+          <button
+            class="primary-button compact"
+            data-action="add-hidratacao"
+          >
+            ${icon("plus")}
+            Registrar
+          </button>
+
+          <button
+            class="ghost-button compact"
+            data-action="config-hidratacao"
+          >
+            ${icon("edit")}
+            Meta
+          </button>
+
+        </div>
+      `
+    )}
+
+    <div class="hydration-card">
+
+      <div class="hydration-top">
+
+        <div>
+
+          <span class="eyebrow">
+            HOJE
+          </span>
+
+          <h2>
+            ${total} ml
+          </h2>
+
+          <p>
+            de ${goal} ml de meta
+          </p>
+
+        </div>
+
+        <div class="water-drop">
+          ◉
+        </div>
+
       </div>
-    </section>
 
-    <section class="v3-my-day">
-      <div class="v3-day-head">
-        <h2>Meu dia</h2>
-        <button class="secondary v3-talk" data-page="assistente">Falar com a LiDire</button>
+      <div class="progress">
+
+        <span
+          style="width:${pct}%"
+        ></span>
+
       </div>
-      ${events.length ? `<div class="v3-day-list">${events.map(x=>`
-        <button class="v3-day-row" data-page="agenda">
-          <time>${esc(x.time || "--:--")}</time>
-          <span><b>${esc(x.title)}</b><small>${esc(x.location || x.note || "Compromisso")}</small></span>
-        </button>`).join("")}</div>` :
-        `<div class="v3-empty-day">Sua agenda está livre hoje. <button data-action="add-commitment">Adicionar compromisso</button></div>`}
-    </section>
 
-    ${conflicts.length ? `<div class="v3-alert warning"><b>⚠ Atenção à agenda</b><span>${esc(conflicts[0])}</span><button data-page="agenda">Ver agenda →</button></div>` : ""}
-    ${fs.warning ? `<div class="v3-alert ${fs.level}"><b>💰 Atenção às finanças</b><span>${esc(fs.message)}</span><button data-page="financas">Ver finanças →</button></div>` : ""}
+      <div class="progress-labels">
+
+        <span>
+          0 ml
+        </span>
+
+        <strong>
+          ${pct}%
+        </strong>
+
+        <span>
+          ${goal} ml
+        </span>
+
+      </div>
+
+      <div class="quick-water">
+
+        ${[200, 300, 500]
+          .map(
+            (value) => `
+              <button
+                data-action="quick-water"
+                data-value="${value}"
+              >
+                +${value} ml
+              </button>
+            `
+          )
+          .join("")}
+
+      </div>
+
+    </div>
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          Meta de hidratação
+        </div>
+
+        <button
+          class="text-button"
+          data-action="config-hidratacao"
+        >
+          Alterar
+        </button>
+
+      </div>
+
+      <div class="hydration-settings-summary">
+
+        <p>
+          <strong>
+            ${config.amountPerPeriod} ml
+          </strong>
+          a cada
+          <strong>
+            ${config.intervalMinutes} min
+          </strong>
+        </p>
+
+        <p>
+          Das
+          <strong>
+            ${esc(config.startTime)}
+          </strong>
+          às
+          <strong>
+            ${esc(config.endTime)}
+          </strong>
+        </p>
+
+      </div>
+
+    </div>
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          Registros de hoje
+        </div>
+
+        <button
+          class="text-button"
+          data-action="reset-hidratacao"
+        >
+          Limpar
+        </button>
+
+      </div>
+
+      ${
+        records.length
+          ? `
+            <div class="item-list">
+
+              ${records
+                .map(
+                  (x) => `
+                    <div class="list-item">
+
+                      <div class="module-icon small">
+                        ◉
+                      </div>
+
+                      <div class="item-main">
+
+                        <strong>
+                          ${x.amount} ml
+                        </strong>
+
+                        <span>
+                          ${new Date(
+                            x.createdAt
+                          ).toLocaleTimeString(
+                            "pt-BR",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            }
+                          )}
+                        </span>
+
+                      </div>
+
+                      <div class="item-actions">
+
+                        <button
+                          data-action="delete-hidratacao"
+                          data-id="${x.id}"
+                        >
+                          ${icon("trash")}
+                        </button>
+
+                      </div>
+
+                    </div>
+                  `
+                )
+                .join("")}
+
+            </div>
+          `
+          : `
+            <p class="muted">
+              Nenhum registro hoje.
+            </p>
+          `
+      }
+
+    </div>
   `);
 }
 
-function v3AgendaConflicts() {
-  const a=state.data.compromissos.filter(x=>x.date&&x.time), out=[];
-  for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) {
-    if(a[i].date!==a[j].date) continue;
-    const p=a[i].time.split(":").map(Number), q=a[j].time.split(":").map(Number);
-    const d=Math.abs((p[0]*60+p[1])-(q[0]*60+q[1]));
-    if(d===0) out.push(`"${a[i].title}" e "${a[j].title}" estão no mesmo horário (${a[i].time}).`);
-    else if(d<=30) out.push(`"${a[i].title}" e "${a[j].title}" estão separados por apenas ${d} minutos.`);
-  }
-  return out;
+/* =========================================================
+   ALIMENTAÇÃO
+   ========================================================= */
+
+function getCaloriesConsumedToday() {
+  return state.data.alimentacao
+    .filter(
+      (x) =>
+        x.date === todayISO()
+    )
+    .reduce(
+      (sum, x) =>
+        sum + Number(x.calories || 0),
+      0
+    );
 }
 
-function v3FinanceStatus() {
-  const expenses=state.data.financas.filter(x=>x.type==="despesa");
-  const total=expenses.reduce((s,x)=>s+num(x.value),0);
-  const limit=num(state.settings?.financeLimit);
-  if(!limit) return {warning:false,total,limit,pct:0};
-  const pct=total/limit*100;
-  if(pct>=100) return {warning:true,level:"danger",total,limit,pct,message:`Você atingiu ou ultrapassou o teto de ${money(limit)}.`};
-  if(pct>=num(state.settings.financeWarning||80)) return {warning:true,level:"warning",total,limit,pct,message:`Você já utilizou ${Math.round(pct)}% do teto de ${money(limit)}.`};
-  return {warning:false,total,limit,pct};
+function getCaloriesRemainingToday() {
+  const goal =
+    Number(
+      state.data.alimentacaoConfig
+        .dailyCalories || 0
+    );
+
+  const consumed =
+    getCaloriesConsumedToday();
+
+  return Math.max(
+    0,
+    goal - consumed
+  );
 }
 
-function v3AddCommitment(existing=null) {
-  const x=existing||{title:"",date:today(),time:"",location:"",note:""};
-  v3Modal(existing?"Editar compromisso":"Novo compromisso",
-    `${v3Field("Título","title",x.title,"text","required")}${v3Field("Data","date",x.date,"date","required")}${v3Field("Horário","time",x.time,"time")}${v3Field("Local","location",x.location)}${v3Textarea("Observação","note",x.note)}`,
-    existing?"Salvar":"Adicionar",
-    fd=>{
-      const val={title:fd.get("title"),date:fd.get("date"),time:fd.get("time"),location:fd.get("location"),note:fd.get("note")};
-      if(existing) Object.assign(existing,val); else state.data.compromissos.push({id:uid("comp"),...val});
-      persist();v3CloseModal();render();toast(existing?"Compromisso atualizado.":"Compromisso adicionado.");
-    });
+function alimentacao() {
+  const goal =
+    Number(
+      state.data.alimentacaoConfig
+        .dailyCalories || 0
+    );
+
+  const consumed =
+    getCaloriesConsumedToday();
+
+  const remaining =
+    Math.max(
+      0,
+      goal - consumed
+    );
+
+  const percent = goal
+    ? Math.min(
+        100,
+        Math.round(
+          (consumed / goal) * 100
+        )
+      )
+    : 0;
+
+  const meals =
+    state.data.alimentacao
+      .filter(
+        (x) =>
+          x.date === todayISO()
+      )
+      .sort(
+        (a, b) =>
+          (a.time || "").localeCompare(
+            b.time || ""
+          )
+      );
+
+  return appShell(`
+    ${pageHeader(
+      "BEM-ESTAR",
+      "Alimentação",
+      "Registre suas refeições e acompanhe suas calorias.",
+      `
+        <div class="page-header-actions">
+
+          <button
+            class="primary-button compact"
+            data-action="add-alimentacao"
+          >
+            ${icon("plus")}
+            Refeição
+          </button>
+
+          <button
+            class="ghost-button compact"
+            data-action="config-alimentacao"
+          >
+            ${icon("edit")}
+            Meta
+          </button>
+
+        </div>
+      `
+    )}
+
+    <div class="stats-grid">
+
+      ${statCard(
+        `${consumed} kcal`,
+        "Consumidas hoje",
+        "pink"
+      )}
+
+      ${statCard(
+        `${remaining} kcal`,
+        "Restantes",
+        "cyan"
+      )}
+
+      ${statCard(
+        `${goal} kcal`,
+        "Meta diária",
+        "purple"
+      )}
+
+    </div>
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div>
+          <div class="toolbar-title">
+            Meta diária
+          </div>
+
+          <small class="muted">
+            ${consumed} de ${goal} kcal
+          </small>
+        </div>
+
+        <button
+          class="text-button"
+          data-action="config-alimentacao"
+        >
+          Alterar
+        </button>
+
+      </div>
+
+      <div class="progress">
+
+        <span
+          style="width:${percent}%"
+        ></span>
+
+      </div>
+
+      <div class="progress-labels">
+
+        <span>
+          0 kcal
+        </span>
+
+        <strong>
+          ${percent}%
+        </strong>
+
+        <span>
+          ${goal} kcal
+        </span>
+
+      </div>
+
+    </div>
+
+    <div class="content-card">
+
+      <div class="card-toolbar">
+
+        <div class="toolbar-title">
+          Refeições de hoje
+        </div>
+
+      </div>
+
+      ${
+        meals.length
+          ? `
+            <div class="item-list">
+
+              ${meals
+                .map(
+                  (meal) => `
+                    <div class="list-item">
+
+                      <div class="module-icon small">
+                        🍽️
+                      </div>
+
+                      <div class="item-main">
+
+                        <strong>
+                          ${esc(
+                            meal.mealType
+                          )}
+                        </strong>
+
+                        <span>
+
+                          ${
+                            meal.time
+                              ? `${icon(
+                                  "clock"
+                                )} ${esc(
+                                  meal.time
+                                )}`
+                              : ""
+                          }
+
+                          ${
+                            meal.foods
+                              ? ` · ${esc(
+                                  meal.foods
+                                )}`
+                              : ""
+                          }
+
+                        </span>
+
+                      </div>
+
+                      <strong
+                        class="finance-value expense"
+                      >
+                        ${meal.calories} kcal
+                      </strong>
+
+                      <div class="item-actions">
+
+                        <button
+                          data-action="edit-alimentacao"
+                          data-id="${meal.id}"
+                        >
+                          ${icon("edit")}
+                        </button>
+
+                        <button
+                          data-action="delete-alimentacao"
+                          data-id="${meal.id}"
+                        >
+                          ${icon("trash")}
+                        </button>
+
+                      </div>
+
+                    </div>
+                  `
+                )
+                .join("")}
+
+            </div>
+          `
+          : emptyState(
+              "Nenhuma refeição registrada",
+              "Adicione sua primeira refeição de hoje.",
+              "Adicionar refeição",
+              "add-alimentacao"
+            )
+      }
+
+    </div>
+  `);
 }
 
-function v3AddShoppingList(existing=null) {
-  const x=existing||{name:""};
-  v3Modal(existing?"Editar lista":"Nova lista de compras",v3Field("Nome da lista","name",x.name,"text","required"),
-    existing?"Salvar":"Criar",fd=>{
-      if(existing)x.name=fd.get("name");
-      else state.data.comprasListas.push({id:uid("lista"),name:fd.get("name"),items:[]});
-      persist();v3CloseModal();render();toast(existing?"Lista atualizada.":"Lista criada.");
-    });
-}
+function financas() {
+  const income =
+    state.data.financas
+      .filter(
+        (x) => x.type === "income"
+      )
+      .reduce(
+        (s, x) =>
+          s + Number(x.value || 0),
+        0
+      );
 
-function v3AddShoppingItem(listId) {
-  const list=state.data.comprasListas.find(x=>x.id===listId); if(!list)return;
-  v3Modal("Adicionar item",`${v3Field("Item","name","","text","required")}${v3Field("Quantidade","quantity")}`,"Adicionar",fd=>{
-    list.items.push({id:uid("item"),name:fd.get("name"),quantity:fd.get("quantity"),done:false});
-    persist();v3CloseModal();render();toast("Item adicionado.");
+  const expense =
+    state.data.financas
+      .filter(
+        (x) => x.type === "expense"
+      )
+      .reduce(
+        (s, x) =>
+          s + Number(x.value || 0),
+        0
+      );
+
+  return listPage({
+    key: "financas",
+
+    title: "Finanças",
+
+    subtitle:
+      "Tenha uma visão simples do que entra e sai.",
+
+    eyebrow: "DINHEIRO",
+
+    stats: () => `
+      ${statCard(
+        money(income),
+        "Entradas",
+        "cyan"
+      )}
+
+      ${statCard(
+        money(expense),
+        "Saídas",
+        "pink"
+      )}
+
+      ${statCard(
+        money(income - expense),
+        "Saldo",
+        "purple"
+      )}
+    `,
+
+    render: (x) => `
+      <div class="list-item">
+
+        <div class="finance-icon ${x.type}">
+          ${
+            x.type === "income"
+              ? "↑"
+              : "↓"
+          }
+        </div>
+
+        <div class="item-main">
+
+          <strong>
+            ${esc(x.title)}
+          </strong>
+
+          <span>
+            ${dateBR(
+              x.date || todayISO()
+            )}
+
+            ·
+
+            ${
+              x.category
+                ? esc(x.category)
+                : "Geral"
+            }
+          </span>
+
+        </div>
+
+        <strong
+          class="finance-value ${x.type}"
+        >
+          ${
+            x.type === "income"
+              ? "+"
+              : "-"
+          }
+
+          ${money(x.value)}
+        </strong>
+
+        <div class="item-actions">
+
+          <button
+            data-action="edit-financa"
+            data-id="${x.id}"
+          >
+            ${icon("edit")}
+          </button>
+
+          <button
+            data-action="delete-financa"
+            data-id="${x.id}"
+          >
+            ${icon("trash")}
+          </button>
+
+        </div>
+
+      </div>
+    `,
+
+    filter: `
+      <button
+        class="filter-button"
+        data-action="add-financa"
+      >
+        + Entrada / saída
+      </button>
+    `
   });
 }
 
-function v3AddStudy(existing=null) {
-  const x=existing||{subject:"",topic:"",date:today(),duration:"",notes:"",references:[]};
-  v3Modal(existing?"Editar matéria":"Nova matéria",
-    `${v3Field("Matéria","subject",x.subject,"text","required")}${v3Field("Tema / conteúdo","topic",x.topic)}${v3Field("Data","date",x.date,"date")}${v3Field("Duração (min)","duration",x.duration,"number",'min="0"')}${v3Textarea("Anotações","notes",x.notes)}${v3Textarea("Referências bibliográficas — um link por linha","references",(x.references||[]).join("\n"))}`,
-    existing?"Salvar":"Cadastrar",fd=>{
-      const refs=String(fd.get("references")||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-      const val={subject:fd.get("subject"),title:fd.get("subject"),topic:fd.get("topic"),date:fd.get("date"),duration:fd.get("duration"),notes:fd.get("notes"),references:refs};
-      if(existing)Object.assign(existing,val); else state.data.estudos.push({id:uid("study"),...val,done:false});
-      persist();v3CloseModal();render();toast(existing?"Matéria atualizada.":"Matéria cadastrada.");
-    });
+function objetivos() {
+  return listPage({
+    key: "objetivos",
+
+    title: "Objetivos",
+
+    subtitle:
+      "Dê forma aos planos que você quer realizar.",
+
+    eyebrow: "DIREÇÃO",
+
+    render: (x) => `
+      <div class="goal-item">
+
+        <div class="goal-top">
+
+          <div>
+
+            <strong>
+              ${esc(x.title)}
+            </strong>
+
+            <span>
+              ${
+                x.deadline
+                  ? `Até ${dateBR(
+                      x.deadline
+                    )}`
+                  : "Sem prazo"
+              }
+            </span>
+
+          </div>
+
+          <b>
+            ${Number(
+              x.progress || 0
+            )}%
+          </b>
+
+        </div>
+
+        <div class="progress">
+
+          <span
+            style="width:${Math.min(
+              100,
+              Number(x.progress || 0)
+            )}%"
+          ></span>
+
+        </div>
+
+        <div class="goal-actions">
+
+          <button
+            data-action="progress-objetivo"
+            data-id="${x.id}"
+          >
+            Atualizar progresso
+          </button>
+
+          <button
+            data-action="edit-objetivo"
+            data-id="${x.id}"
+          >
+            Editar
+          </button>
+
+          <button
+            data-action="delete-objetivo"
+            data-id="${x.id}"
+          >
+            Excluir
+          </button>
+
+        </div>
+
+      </div>
+    `
+  });
 }
 
-function v3AddWorkout(existing=null) {
-  const x=existing||{title:"",date:today(),time:"",video:"",notes:"",exercises:[]};
-  const rows=(x.exercises||[]).map((e,i)=>v3ExerciseRow(i,e)).join("");
-  v3Modal(existing?"Editar treino":"Novo treino",
-    `${v3Field("Nome do treino","title",x.title,"text","required")}${v3Field("Data","date",x.date,"date")}${v3Field("Horário","time",x.time,"time")}${v3Field("Vídeo de execução — link","video",x.video,"url",'placeholder="https://..."')}${v3Textarea("Observações","notes",x.notes)}
-    <div class="form-field full"><span>Exercícios</span><div id="v3ExerciseRows" class="v3-exercise-form">${rows||v3ExerciseRow(0,{})}</div><button type="button" class="secondary" data-action="v3-add-exercise-row">+ Adicionar exercício</button></div>`,
-    existing?"Salvar":"Criar treino",fd=>{
-      const exercises=[];
-      const idx=[...fd.keys()].filter(k=>k.startsWith("v3_name_")).map(k=>k.split("_").pop());
-      [...new Set(idx)].forEach(i=>{
-        const name=String(fd.get(`v3_name_${i}`)||"").trim();
-        if(name) exercises.push({name,planned:fd.get(`v3_planned_${i}`)||"",executed:fd.get(`v3_executed_${i}`)||""});
+function familia() {
+  return listPage({
+    key: "familia",
+
+    title: "Família",
+
+    subtitle:
+      "Uma visão compartilhada para organizar a vida juntos.",
+
+    eyebrow: "COMPARTILHAMENTO",
+
+    emptyTitle:
+      "Ainda não há pessoas adicionadas",
+
+    emptyText:
+      "Cadastre pessoas para estruturar sua área familiar.",
+
+    render: (x) => `
+      <div class="list-item">
+
+        <div class="avatar">
+          ${esc(
+            (x.name || "?")
+              .charAt(0)
+              .toUpperCase()
+          )}
+        </div>
+
+        <div class="item-main">
+
+          <strong>
+            ${esc(x.name)}
+          </strong>
+
+          <span>
+
+            ${esc(
+              x.relation || "Membro"
+            )}
+
+            ${
+              x.email
+                ? ` · ${esc(
+                    x.email
+                  )}`
+                : ""
+            }
+
+          </span>
+
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            data-action="edit-familia"
+            data-id="${x.id}"
+          >
+            ${icon("edit")}
+          </button>
+
+          <button
+            data-action="delete-familia"
+            data-id="${x.id}"
+          >
+            ${icon("trash")}
+          </button>
+
+        </div>
+
+      </div>
+    `
+  });
+}
+
+function assistente() {
+  const pending =
+    state.data.tarefas.filter(
+      (x) => !x.done
+    );
+
+  const today =
+    state.data.compromissos.filter(
+      (x) =>
+        x.date === todayISO()
+    );
+
+  return appShell(`
+    ${pageHeader(
+      "INTELIGÊNCIA",
+      "Assistente LiDire",
+      "Uma visão rápida da sua rotina para ajudar você a encontrar o próximo passo."
+    )}
+
+    <div class="assistant-screen">
+
+      <div class="assistant-avatar">
+        ✦
+      </div>
+
+      <h2>
+        Como posso ajudar?
+      </h2>
+
+      <p>
+        Experimente uma das sugestões abaixo.
+      </p>
+
+      <div class="suggestions">
+
+        <button
+          data-action="assistant-question"
+          data-question="O que tenho para hoje?"
+        >
+          O que tenho para hoje?
+        </button>
+
+        <button
+          data-action="assistant-question"
+          data-question="Quais tarefas estão pendentes?"
+        >
+          Quais tarefas estão pendentes?
+        </button>
+
+        <button
+          data-action="assistant-question"
+          data-question="Como está minha rotina?"
+        >
+          Como está minha rotina?
+        </button>
+
+      </div>
+
+      <div
+        id="assistant-response"
+        class="assistant-response"
+      >
+
+        <strong>
+          Resumo atual
+        </strong>
+
+        <p>
+          Você tem
+          <b>${pending.length}</b>
+          tarefa(s) pendente(s) e
+          <b>${today.length}</b>
+          compromisso(s) hoje.
+        </p>
+
+      </div>
+
+    </div>
+  `);
+}
+
+function explorar() {
+  return appShell(`
+    ${pageHeader(
+      "LIDIRE",
+      "Tudo em um só lugar",
+      "Conheça os espaços que ajudam a transformar rotina em clareza."
+    )}
+
+    <div class="explore-grid">
+
+      ${modules
+        .map(moduleCard)
+        .join("")}
+
+      <button
+        class="module-card featured"
+        data-page="assistente"
+      >
+
+        <span class="module-icon">
+          ✦
+        </span>
+
+        <span class="module-content">
+
+          <strong>
+            Assistente LiDire
+          </strong>
+
+          <small>
+            Seu copiloto para organizar a rotina.
+          </small>
+
+        </span>
+
+        <span class="module-arrow">
+          ${icon("arrow")}
+        </span>
+
+      </button>
+
+    </div>
+  `);
+}
+
+function perfil() {
+  const hasPhoto =
+    Boolean(state.user.photo);
+
+  return appShell(`
+    ${pageHeader(
+      "MINHA CONTA",
+      "Perfil",
+      "Personalize sua experiência na LiDire."
+    )}
+
+    <div class="profile-card">
+
+      <div class="profile-avatar-large">
+
+        ${
+          hasPhoto
+            ? `
+              <img
+                src="${esc(
+                  state.user.photo
+                )}"
+                alt="Foto de perfil"
+              >
+            `
+            : `
+              ${esc(
+                (
+                  state.user.name ||
+                  "A"
+                )
+                  .charAt(0)
+                  .toUpperCase()
+              )}
+            `
+        }
+
+      </div>
+
+      <h2>
+        ${esc(
+          state.user.name ||
+            "Seu nome"
+        )}
+      </h2>
+
+      <p>
+        ${esc(
+          state.user.email ||
+            "Adicione seu e-mail"
+        )}
+      </p>
+
+      <div class="profile-photo-actions">
+
+        <button
+          class="primary-button"
+          data-action="add-profile-photo"
+        >
+          ${icon("camera")}
+          ${
+            hasPhoto
+              ? "Alterar foto"
+              : "Adicionar foto"
+          }
+        </button>
+
+        ${
+          hasPhoto
+            ? `
+              <button
+                class="ghost-button"
+                data-action="delete-profile-photo"
+              >
+                ${icon("trash")}
+                Excluir foto
+              </button>
+            `
+            : ""
+        }
+
+      </div>
+
+      <button
+        class="primary-button"
+        data-action="edit-profile"
+      >
+        ${icon("edit")}
+        Editar perfil
+      </button>
+
+    </div>
+
+    <div class="settings-card">
+
+      <button
+        data-action="edit-profile"
+      >
+
+        <span>✎</span>
+
+        <div>
+
+          <strong>
+            Dados pessoais
+          </strong>
+
+          <small>
+            Nome, e-mail, idade e telefone
+          </small>
+
+        </div>
+
+        ${icon("arrow")}
+
+      </button>
+
+      <button
+        data-action="clear-local"
+      >
+
+        <span>↺</span>
+
+        <div>
+
+          <strong>
+            Redefinir dados locais
+          </strong>
+
+          <small>
+            Apaga os dados salvos neste dispositivo
+          </small>
+
+        </div>
+
+        ${icon("arrow")}
+
+      </button>
+
+    </div>
+  `);
+}
+
+const pages = {
+  inicio: home,
+  agenda,
+  tarefas,
+  compras,
+  estudos,
+  treinos,
+  hidratacao,
+  alimentacao,
+  financas,
+  objetivos,
+  familia,
+  assistente,
+  explorar,
+  perfil
+};
+
+function render() {
+  const root =
+    document.getElementById("app");
+
+  if (!root) {
+    console.error(
+      "Elemento #app não encontrado."
+    );
+    return;
+  }
+
+  if (
+    currentPage === "compras" &&
+    currentShoppingList
+  ) {
+    root.innerHTML =
+      listaCompras(
+        currentShoppingList
+      );
+  } else {
+    root.innerHTML =
+      (
+        pages[currentPage] ||
+        home
+      )();
+  }
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+        }
+
+function openModal(
+  title,
+  body,
+  options = {}
+) {
+  closeModal();
+
+  modal =
+    document.createElement("div");
+
+  modal.className =
+    "modal-backdrop";
+
+  modal.innerHTML = `
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+    >
+
+      <div class="modal-header">
+
+        <div>
+
+          <span class="eyebrow">
+            ${esc(
+              options.eyebrow ||
+                "LIDIRE"
+            )}
+          </span>
+
+          <h2>
+            ${esc(title)}
+          </h2>
+
+        </div>
+
+        <button
+          class="modal-close"
+          data-action="close-modal"
+        >
+          ×
+        </button>
+
+      </div>
+
+      <form
+        id="lidire-form"
+        class="form-grid"
+      >
+
+        ${body}
+
+        <div class="modal-footer">
+
+          <button
+            type="button"
+            class="ghost-button"
+            data-action="close-modal"
+          >
+            Cancelar
+          </button>
+
+          <button
+            class="primary-button"
+            type="submit"
+          >
+            ${esc(
+              options.submit ||
+                "Salvar"
+            )}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal
+    .querySelector(
+      "input, select, textarea"
+    )
+    ?.focus();
+}
+
+function closeModal() {
+  document
+    .querySelector(
+      ".modal-backdrop"
+    )
+    ?.remove();
+
+  modal = null;
+}
+
+/* =========================================================
+   FORMULÁRIOS
+   ========================================================= */
+
+function addForm(key) {
+  if (key === "compromissos") {
+    openModal(
+      "Novo compromisso",
+
+      `
+        ${field(
+          "Título",
+          "title",
+          "text",
+          "",
+          "required"
+        )}
+
+        ${field(
+          "Data",
+          "date",
+          "date",
+          todayISO(),
+          "required"
+        )}
+
+        ${field(
+          "Horário",
+          "time",
+          "time",
+          ""
+        )}
+
+        ${field(
+          "Local",
+          "location"
+        )}
+      `,
+
+      {
+        submit: "Adicionar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.compromissos.push({
+        id: uid("c"),
+        title: f.get("title"),
+        date: f.get("date"),
+        time: f.get("time"),
+        location: f.get("location")
       });
-      const val={title:fd.get("title"),date:fd.get("date"),time:fd.get("time"),video:fd.get("video"),notes:fd.get("notes"),exercises};
-      if(existing)Object.assign(existing,val); else state.data.treinos.push({id:uid("workout"),...val});
-      persist();v3CloseModal();render();toast(existing?"Treino atualizado.":"Treino criado.");
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Compromisso adicionado."
+      );
+    };
+
+    return;
+  }
+
+  if (key === "tarefas") {
+    openModal(
+      "Nova tarefa",
+
+      `
+        ${field(
+          "Tarefa",
+          "title",
+          "text",
+          "",
+          "required"
+        )}
+
+        ${selectField(
+          "Prioridade",
+          "priority",
+          [
+            {
+              value: "",
+              label: "Normal"
+            },
+            {
+              value: "Alta",
+              label: "Alta"
+            },
+            {
+              value: "Média",
+              label: "Média"
+            },
+            {
+              value: "Baixa",
+              label: "Baixa"
+            }
+          ]
+        )}
+
+        ${field(
+          "Prazo",
+          "date",
+          "date"
+        )}
+      `,
+
+      {
+        submit: "Adicionar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.tarefas.push({
+        id: uid("t"),
+        title: f.get("title"),
+        priority:
+          f.get("priority"),
+        date: f.get("date"),
+        done: false
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Tarefa adicionada."
+      );
+    };
+
+    return;
+  }
+
+  if (key === "compras") {
+    adicionarListaCompras();
+    return;
+  }
+
+  if (key === "estudos") {
+    openModal(
+      "Nova sessão de estudo",
+
+      `
+        ${field(
+          "Matéria",
+          "subject",
+          "text",
+          "",
+          "required"
+        )}
+
+        ${field(
+          "Tema",
+          "topic"
+        )}
+
+        ${field(
+          "Data",
+          "date",
+          "date",
+          todayISO()
+        )}
+
+        ${field(
+          "Horário",
+          "time",
+          "time"
+        )}
+
+        ${field(
+          "Duração (min)",
+          "duration",
+          "number"
+        )}
+      `,
+
+      {
+        submit: "Registrar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.estudos.push({
+        id: uid("e"),
+        subject:
+          f.get("subject"),
+        topic:
+          f.get("topic"),
+        date:
+          f.get("date"),
+        time:
+          f.get("time"),
+        duration:
+          f.get("duration"),
+        done: false
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Estudo registrado."
+      );
+    };
+
+    return;
+  }
+
+  if (key === "treinos") {
+    openModal(
+      "Novo treino",
+
+      `
+        ${field(
+          "Nome",
+          "name",
+          "text",
+          "",
+          "required"
+        )}
+
+        ${field(
+          "Tipo",
+          "type"
+        )}
+
+        ${field(
+          "Data",
+          "date",
+          "date",
+          todayISO()
+        )}
+
+        ${field(
+          "Horário",
+          "time",
+          "time"
+        )}
+
+        ${field(
+          "Duração (min)",
+          "duration",
+          "number"
+        )}
+      `,
+
+      {
+        submit: "Registrar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.treinos.push({
+        id: uid("tr"),
+        name: f.get("name"),
+        type: f.get("type"),
+        date: f.get("date"),
+        time: f.get("time"),
+        duration:
+          f.get("duration")
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Treino registrado."
+      );
+    };
+
+    return;
+  }
+
+  if (key === "hidratacao") {
+    openModal(
+      "Registrar água",
+
+      `
+        ${field(
+          "Quantidade (ml)",
+          "amount",
+          "number",
+          "300",
+          "required min='1'"
+        )}
+      `,
+
+      {
+        submit: "Registrar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.hidratacao.push({
+        id: uid("h"),
+        amount:
+          Number(
+            f.get("amount")
+          ),
+        createdAt:
+          new Date().toISOString()
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Hidratação registrada."
+      );
+    };
+
+    return;
+  }
+
+  if (key === "alimentacao") {
+    addMealForm();
+    return;
+  }
+
+  if (key === "financas") {
+    addFinanceForm();
+    return;
+  }
+
+  if (key === "objetivos") {
+    addGoalForm();
+    return;
+  }
+
+  if (key === "familia") {
+    addFamilyForm();
+    return;
+  }
+}
+
+/* =========================================================
+   COMPRAS
+   ========================================================= */
+
+function adicionarListaCompras() {
+  openModal(
+    "Nova lista de compras",
+
+    field(
+      "Nome da lista",
+      "name",
+      "text",
+      "",
+      "required"
+    ),
+
+    {
+      submit: "Criar lista"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    if (!state.data.compras) {
+      state.data.compras = [];
+    }
+
+    state.data.compras.push({
+      id: uid("lista"),
+      name: f.get("name"),
+      items: []
     });
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Lista criada."
+    );
+  };
 }
 
-function v3ExerciseRow(i,e={}) {
-  return `<div class="v3-exercise-row"><input name="v3_name_${i}" value="${esc(e.name||"")}" placeholder="Exercício"><input name="v3_planned_${i}" value="${esc(e.planned||"")}" placeholder="Carga planejada"><input name="v3_executed_${i}" value="${esc(e.executed||"")}" placeholder="Carga executada"></div>`;
+function addItemCompra(listId) {
+  const lista =
+    state.data.compras.find(
+      (x) => x.id === listId
+    );
+
+  if (!lista) return;
+
+  openModal(
+    "Adicionar item",
+
+    `
+      ${field(
+        "Item",
+        "name",
+        "text",
+        "",
+        "required"
+      )}
+
+      ${field(
+        "Quantidade",
+        "quantity"
+      )}
+
+      ${field(
+        "Categoria",
+        "category"
+      )}
+    `,
+
+    {
+      submit: "Adicionar"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    lista.items =
+      lista.items || [];
+
+    lista.items.push({
+      id: uid("item"),
+      name: f.get("name"),
+      quantity:
+        f.get("quantity"),
+      category:
+        f.get("category"),
+      done: false
+    });
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Item adicionado."
+    );
+  };
 }
 
-function v3AddWater() {
-  v3Modal("Registrar água",v3Field("Quantidade (ml)","amount","300","number","min=\"1\" required"),"Registrar",fd=>{
-    state.data.hidratacao.push({id:uid("agua"),amount:num(fd.get("amount")),date:today(),time:new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})});
-    persist();v3CloseModal();render();toast("Água registrada.");
-  });
+/* =========================================================
+   ALIMENTAÇÃO
+   ========================================================= */
+
+function addMealForm(item = null) {
+  const editing =
+    Boolean(item);
+
+  openModal(
+    editing
+      ? "Editar refeição"
+      : "Nova refeição",
+
+    `
+      ${selectField(
+        "Refeição",
+        "mealType",
+        [
+          {
+            value: "Café da manhã",
+            label: "Café da manhã"
+          },
+          {
+            value: "Lanche da manhã",
+            label: "Lanche da manhã"
+          },
+          {
+            value: "Almoço",
+            label: "Almoço"
+          },
+          {
+            value: "Lanche da tarde",
+            label: "Lanche da tarde"
+          },
+          {
+            value: "Jantar",
+            label: "Jantar"
+          },
+          {
+            value: "Ceia",
+            label: "Ceia"
+          },
+          {
+            value: "Outra",
+            label: "Outra"
+          }
+        ],
+        item?.mealType ||
+          "Café da manhã"
+      )}
+
+      ${field(
+        "Data",
+        "date",
+        "date",
+        item?.date ||
+          todayISO(),
+        "required"
+      )}
+
+      ${field(
+        "Horário",
+        "time",
+        "time",
+        item?.time || "",
+        "required"
+      )}
+
+      <label class="form-field">
+
+        <span>
+          Alimentos
+        </span>
+
+        <textarea
+          name="foods"
+          rows="4"
+          placeholder="Ex.: arroz, feijão, frango, salada"
+          required
+        >${esc(
+          item?.foods || ""
+        )}</textarea>
+
+      </label>
+
+      ${field(
+        "Calorias (kcal)",
+        "calories",
+        "number",
+        item?.calories || "",
+        "min='0' step='1' required"
+      )}
+    `,
+
+    {
+      submit: editing
+        ? "Salvar"
+        : "Adicionar"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const data = {
+      mealType:
+        f.get("mealType"),
+      date:
+        f.get("date"),
+      time:
+        f.get("time"),
+      foods:
+        f.get("foods"),
+      calories:
+        Number(
+          f.get("calories") || 0
+        )
+    };
+
+    if (editing) {
+      Object.assign(
+        item,
+        data
+      );
+
+      toast(
+        "Refeição atualizada."
+      );
+    } else {
+      state.data.alimentacao.push({
+        id: uid("meal"),
+        ...data
+      });
+
+      toast(
+        "Refeição adicionada."
+      );
+    }
+
+    saveState();
+    closeModal();
+    render();
+  };
 }
 
-function v3FinanceLimit() {
-  v3Modal("Teto de gastos",`${v3Field("Teto mensal (R$)","limit",state.settings.financeLimit||"","number",'step="0.01" min="0"')}${v3Field("Avisar a partir de (%)","warning",state.settings.financeWarning||80,"number",'min="1" max="100"')}`,"Salvar",fd=>{
-    state.settings.financeLimit=num(fd.get("limit"));state.settings.financeWarning=num(fd.get("warning"))||80;
-    persist();v3CloseModal();render();toast("Teto de gastos atualizado.");
-  });
+function configurarAlimentacao() {
+  const current =
+    state.data.alimentacaoConfig
+      .dailyCalories;
+
+  openModal(
+    "Meta diária de calorias",
+
+    `
+      ${field(
+        "Meta diária (kcal)",
+        "dailyCalories",
+        "number",
+        current,
+        "min='1' required"
+      )}
+
+      <p class="muted">
+        A LiDire descontará automaticamente
+        as calorias das refeições registradas
+        no dia.
+      </p>
+    `,
+
+    {
+      submit: "Salvar meta"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    state.data.alimentacaoConfig
+      .dailyCalories =
+      Number(
+        f.get("dailyCalories")
+      );
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Meta de calorias atualizada."
+    );
+  };
 }
 
-function v3Modal(title,body,submit,onSubmit) {
-  v3CloseModal();
-  const b=document.createElement("div");b.className="modal-backdrop";
-  b.innerHTML=`<div class="modal"><div class="modal-header"><div><span class="eyebrow">LIDIRE V3</span><h2>${esc(title)}</h2></div><button class="modal-close" data-action="v3-close-modal">×</button></div><form id="v3Form" class="form-grid">${body}<div class="modal-footer"><button type="button" class="secondary" data-action="v3-close-modal">Cancelar</button><button type="submit" class="primary">${esc(submit)}</button></div></form></div>`;
-  document.body.appendChild(b);
-  b.querySelector("form").addEventListener("submit",e=>{e.preventDefault();onSubmit(new FormData(e.currentTarget));});
-  b.querySelector("input,textarea,select")?.focus();
+/* =========================================================
+   HIDRATAÇÃO — CONFIGURAÇÃO
+   ========================================================= */
+
+function configurarHidratacao() {
+  const config =
+    state.data.hidratacaoConfig;
+
+  openModal(
+    "Configurar hidratação",
+
+    `
+      ${field(
+        "Quantidade por período (ml)",
+        "amountPerPeriod",
+        "number",
+        config.amountPerPeriod,
+        "min='1' required"
+      )}
+
+      ${field(
+        "Intervalo entre períodos (minutos)",
+        "intervalMinutes",
+        "number",
+        config.intervalMinutes,
+        "min='1' required"
+      )}
+
+      ${field(
+        "Horário inicial",
+        "startTime",
+        "time",
+        config.startTime,
+        "required"
+      )}
+
+      ${field(
+        "Horário final",
+        "endTime",
+        "time",
+        config.endTime,
+        "required"
+      )}
+
+      <p class="muted">
+        Exemplo: 300 ml a cada 120 minutos,
+        das 08:00 às 20:00.
+      </p>
+    `,
+
+    {
+      submit: "Salvar configuração"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    state.data.hidratacaoConfig = {
+      amountPerPeriod:
+        Number(
+          f.get(
+            "amountPerPeriod"
+          )
+        ),
+
+      intervalMinutes:
+        Number(
+          f.get(
+            "intervalMinutes"
+          )
+        ),
+
+      startTime:
+        f.get("startTime"),
+
+      endTime:
+        f.get("endTime")
+    };
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Meta de hidratação atualizada."
+    );
+  };
 }
 
-function v3CloseModal(){document.querySelector(".modal-backdrop")?.remove();}
+/* =========================================================
+   FINANÇAS
+   ========================================================= */
 
-function v3Field(label,name,value="",type="text",attrs="") {
-  return `<label class="form-field"><span>${esc(label)}</span><input name="${esc(name)}" type="${type}" value="${esc(value)}" ${attrs}></label>`;
-}
-function v3Textarea(label,name,value="") {
-  return `<label class="form-field full"><span>${esc(label)}</span><textarea name="${esc(name)}">${esc(value)}</textarea></label>`;
+function addFinanceForm(item = null) {
+  const editing =
+    Boolean(item);
+
+  openModal(
+    editing
+      ? "Editar lançamento"
+      : "Novo lançamento",
+
+    `
+      ${selectField(
+        "Tipo",
+        "type",
+        [
+          {
+            value: "expense",
+            label: "Saída"
+          },
+          {
+            value: "income",
+            label: "Entrada"
+          }
+        ],
+        item?.type ||
+          "expense"
+      )}
+
+      ${field(
+        "Descrição",
+        "title",
+        "text",
+        item?.title || "",
+        "required"
+      )}
+
+      ${field(
+        "Valor",
+        "value",
+        "number",
+        item?.value || "",
+        "step='0.01' min='0' required"
+      )}
+
+      ${field(
+        "Categoria",
+        "category",
+        "text",
+        item?.category || ""
+      )}
+
+      ${field(
+        "Data",
+        "date",
+        "date",
+        item?.date ||
+          todayISO()
+      )}
+    `,
+
+    {
+      submit: editing
+        ? "Salvar"
+        : "Salvar"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const data = {
+      type:
+        f.get("type"),
+      title:
+        f.get("title"),
+      value:
+        Number(
+          f.get("value") || 0
+        ),
+      category:
+        f.get("category"),
+      date:
+        f.get("date")
+    };
+
+    if (editing) {
+      Object.assign(
+        item,
+        data
+      );
+
+      toast(
+        "Lançamento atualizado."
+      );
+    } else {
+      state.data.financas.push({
+        id: uid("f"),
+        ...data
+      });
+
+      toast(
+        "Lançamento salvo."
+      );
+    }
+
+    saveState();
+    closeModal();
+    render();
+  };
 }
 
-function v3AgendaPage() {
-  const items=[...state.data.compromissos].sort((a,b)=>`${a.date||""} ${a.time||""}`.localeCompare(`${b.date||""} ${b.time||""}`));
-  const conflicts=v3AgendaConflicts();
-  return layout(`<div class="page-header"><div><div class="eyebrow">MINHA ROTINA</div><h1>Agenda</h1><p class="muted">Compromissos, horários e alertas de proximidade.</p></div><button class="primary" data-action="add-commitment">+ Novo</button></div>
-    ${conflicts.length?`<div class="conflict-box">${conflicts.map(x=>`<span>⚠ ${esc(x)}</span>`).join("")}</div>`:""}
-    <div class="stack">${items.length?items.map(x=>`<div class="card item-row"><div class="date-box"><b>${x.date?x.date.slice(8,10):"--"}</b><small>${x.date?new Date(x.date+"T12:00:00").toLocaleDateString("pt-BR",{month:"short"}):""}</small></div><div class="item-main"><b>${esc(x.title)}</b><span>${x.time?esc(x.time):"Sem horário"}${x.location?" · "+esc(x.location):""}</span></div><div class="row-actions"><button class="icon-btn" data-action="edit-commitment" data-id="${x.id}">✎</button><button class="icon-btn" data-action="delete-commitment" data-id="${x.id}">🗑</button></div></div>`).join(""):emptyState("Você ainda não possui compromissos.","Adicionar compromisso","add-commitment")}</div>`);
+/* =========================================================
+   OBJETIVOS
+   ========================================================= */
+
+function addGoalForm(item = null) {
+  const editing =
+    Boolean(item);
+
+  openModal(
+    editing
+      ? "Editar objetivo"
+      : "Novo objetivo",
+
+    `
+      ${field(
+        "Objetivo",
+        "title",
+        "text",
+        item?.title || "",
+        "required"
+      )}
+
+      ${field(
+        "Prazo",
+        "deadline",
+        "date",
+        item?.deadline || ""
+      )}
+
+      ${field(
+        "Progresso (%)",
+        "progress",
+        "number",
+        item?.progress ?? 0,
+        "min='0' max='100'"
+      )}
+    `,
+
+    {
+      submit: editing
+        ? "Salvar"
+        : "Criar objetivo"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const data = {
+      title:
+        f.get("title"),
+      deadline:
+        f.get("deadline"),
+      progress:
+        Number(
+          f.get("progress") || 0
+        )
+    };
+
+    if (editing) {
+      Object.assign(
+        item,
+        data
+      );
+
+      toast(
+        "Objetivo atualizado."
+      );
+    } else {
+      state.data.objetivos.push({
+        id: uid("o"),
+        ...data
+      });
+
+      toast(
+        "Objetivo criado."
+      );
+    }
+
+    saveState();
+    closeModal();
+    render();
+  };
 }
 
-function v3ShoppingPage() {
-  return layout(`<div class="page-header"><div><div class="eyebrow">LISTAS</div><h1>Compras</h1><p class="muted">Crie listas e confirme cada item comprado.</p></div><button class="primary" data-action="v3-add-list">+ Nova lista</button></div>
-    <div class="stack">${state.data.comprasListas.length?state.data.comprasListas.map(list=>{
-      const done=list.items.filter(x=>x.done).length,p=list.items.length?Math.round(done/list.items.length*100):0;
-      return `<section class="card"><div class="list-head"><div><h3>${esc(list.name)}</h3><small class="muted">${done}/${list.items.length} comprados</small></div><div class="row-actions"><button class="icon-btn" data-action="v3-edit-list" data-id="${list.id}">✎</button><button class="icon-btn" data-action="v3-delete-list" data-id="${list.id}">🗑</button></div></div><div class="progress"><span style="width:${p}%"></span></div><div class="v3-shopping-items">${list.items.length?list.items.map(i=>`<label class="shopping-item ${i.done?"checked":""}"><input type="checkbox" ${i.done?"checked":""} data-action="v3-toggle-item" data-list="${list.id}" data-id="${i.id}"><span>${esc(i.name)}${i.quantity?`<small>${esc(i.quantity)}</small>`:""}</span></label>`).join(""):`<p class="muted">Nenhum item.</p>`}</div><button class="text-btn" data-action="v3-add-item" data-id="${list.id}">+ Adicionar item</button></section>`;
-    }).join(""):emptyState("Você ainda não criou uma lista.","Criar lista","v3-add-list")}</div>`);
+/* =========================================================
+   FAMÍLIA
+   ========================================================= */
+
+function addFamilyForm(item = null) {
+  const editing =
+    Boolean(item);
+
+  openModal(
+    editing
+      ? "Editar pessoa"
+      : "Adicionar pessoa",
+
+    `
+      ${field(
+        "Nome",
+        "name",
+        "text",
+        item?.name || "",
+        "required"
+      )}
+
+      ${field(
+        "Relação",
+        "relation",
+        "text",
+        item?.relation || ""
+      )}
+
+      ${field(
+        "E-mail",
+        "email",
+        "email",
+        item?.email || ""
+      )}
+    `,
+
+    {
+      submit: editing
+        ? "Salvar"
+        : "Adicionar"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const data = {
+      name:
+        f.get("name"),
+      relation:
+        f.get("relation"),
+      email:
+        f.get("email")
+    };
+
+    if (editing) {
+      Object.assign(
+        item,
+        data
+      );
+
+      toast(
+        "Pessoa atualizada."
+      );
+    } else {
+      state.data.familia.push({
+        id: uid("m"),
+        ...data
+      });
+
+      toast(
+        "Pessoa adicionada."
+      );
+    }
+
+    saveState();
+    closeModal();
+    render();
+  };
 }
 
-function v3StudiesPage() {
-  return layout(`<div class="page-header"><div><div class="eyebrow">APRENDIZADO</div><h1>Estudos</h1><p class="muted">Matérias, anotações e referências.</p></div><button class="primary" data-action="add-study">+ Matéria</button></div><div class="stack">${state.data.estudos.length?state.data.estudos.map(x=>`<article class="card"><div class="item-row"><button class="check-btn ${x.done?"done":""}" data-action="v3-toggle-study" data-id="${x.id}">${x.done?"✓":""}</button><div class="item-main"><b>${esc(x.subject||x.title)}</b><span>${x.topic?esc(x.topic)+" · ":""}${x.date?formatDate(x.date):"Sem data"}</span></div><div class="row-actions"><button class="icon-btn" data-action="edit-study" data-id="${x.id}">✎</button><button class="icon-btn" data-action="delete-study" data-id="${x.id}">🗑</button></div></div>${x.notes?`<div class="notes-box"><b>Anotações</b><p>${esc(x.notes)}</p></div>`:""}${x.references?.length?`<div class="references"><b>Referências</b>${x.references.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u)}</a>`).join("")}</div>`:""}</article>`).join(""):emptyState("Nenhuma matéria cadastrada.","Adicionar matéria","add-study")}</div>`);
+/* =========================================================
+   PERFIL — FOTO
+   ========================================================= */
+
+function addProfilePhoto() {
+  openModal(
+    state.user.photo
+      ? "Alterar foto de perfil"
+      : "Adicionar foto de perfil",
+
+    `
+      <label class="form-field">
+
+        <span>
+          Foto de perfil
+        </span>
+
+        <input
+          id="profile-photo-input"
+          name="photo"
+          type="file"
+          accept="image/*"
+          required
+        >
+
+      </label>
+
+      <div
+        id="profile-photo-preview"
+        class="profile-photo-preview"
+      ></div>
+    `,
+
+    {
+      submit: state.user.photo
+        ? "Alterar foto"
+        : "Adicionar foto"
+    }
+  );
+
+  const input =
+    modal.querySelector(
+      "#profile-photo-input"
+    );
+
+  const preview =
+    modal.querySelector(
+      "#profile-photo-preview"
+    );
+
+  input.addEventListener(
+    "change",
+    () => {
+      const file =
+        input.files?.[0];
+
+      if (!file) return;
+
+      const reader =
+        new FileReader();
+
+      reader.onload = () => {
+        preview.innerHTML = `
+          <img
+            src="${reader.result}"
+            alt="Prévia da foto"
+          >
+        `;
+      };
+
+      reader.readAsDataURL(file);
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const file =
+      input.files?.[0];
+
+    if (!file) {
+      toast(
+        "Selecione uma foto.",
+        "error"
+      );
+
+      return;
+    }
+
+    const reader =
+      new FileReader();
+
+    reader.onload = () => {
+      state.user.photo =
+        reader.result;
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Foto de perfil atualizada."
+      );
+    };
+
+    reader.readAsDataURL(file);
+  };
 }
 
-function v3WorkoutPage() {
-  return layout(`<div class="page-header"><div><div class="eyebrow">BEM-ESTAR</div><h1>Treinos</h1><p class="muted">Exercícios, cargas e execução.</p></div><button class="primary" data-action="add-workout">+ Treino</button></div><div class="stack">${state.data.treinos.length?state.data.treinos.map(x=>`<article class="card"><div class="item-row"><div class="workout-icon">🏋️</div><div class="item-main"><b>${esc(x.title)}</b><span>${x.date?formatDate(x.date):""}${x.time?" · "+esc(x.time):""}</span></div><div class="row-actions"><button class="icon-btn" data-action="edit-workout" data-id="${x.id}">✎</button><button class="icon-btn" data-action="delete-workout" data-id="${x.id}">🗑</button></div></div>${x.exercises?.length?`<div class="exercise-table"><div class="exercise-row header"><span>Exercício</span><span>Planejada</span><span>Executada</span></div>${x.exercises.map(e=>`<div class="exercise-row"><span>${esc(e.name)}</span><span>${esc(e.planned||"-")}</span><span>${esc(e.executed||"-")}</span></div>`).join("")}</div>`:""}${x.video?`<a class="video-link" href="${esc(x.video)}" target="_blank" rel="noopener noreferrer">▶ Ver vídeo de execução</a>`:""}${x.notes?`<p class="muted">${esc(x.notes)}</p>`:""}</article>`).join(""):emptyState("Nenhum treino registrado.","Adicionar treino","add-workout")}</div>`);
+function deleteProfilePhoto() {
+  if (
+    !state.user.photo
+  ) {
+    toast(
+      "Não há foto de perfil.",
+      "error"
+    );
+
+    return;
+  }
+
+  if (
+    confirm(
+      "Excluir sua foto de perfil?"
+    )
+  ) {
+    state.user.photo = "";
+
+    saveState();
+    render();
+
+    toast(
+      "Foto de perfil excluída."
+    );
+  }
 }
 
-function v3HydrationPage() {
-  const total=state.data.hidratacao.filter(x=>x.date===today()).reduce((s,x)=>s+num(x.amount),0),goal=2000,p=Math.min(100,Math.round(total/goal*100));
-  return layout(`<div class="page-header"><div><div class="eyebrow">BEM-ESTAR</div><h1>Hidratação</h1><p class="muted">Meta, registros e lembretes.</p></div><button class="primary" data-action="add-water">+ Registrar</button></div>
-    <section class="card hydration-v3"><div class="row"><div><span class="eyebrow">HOJE</span><h2>${total} ml</h2><p class="muted">${p}% da meta de ${goal} ml</p></div><div class="water-icon">💧</div></div><div class="progress"><span style="width:${p}%"></span></div><div class="water-buttons">${[200,300,500].map(v=>`<button class="secondary" data-action="quick-water" data-value="${v}">+${v} ml</button>`).join("")}</div></section>
-    <section class="card"><div class="row"><div><h3>Lembrete de hidratação</h3><p class="muted">Enquanto a LiDire estiver aberta.</p></div><label class="switch"><input type="checkbox" data-action="v3-hydration-toggle" ${state.settings.hydrationReminder?"checked":""}><span></span></label></div><label class="interval-label">Repetir a cada<select data-action="v3-hydration-interval"><option value="30" ${state.settings.hydrationInterval==30?"selected":""}>30 minutos</option><option value="60" ${state.settings.hydrationInterval==60?"selected":""}>1 hora</option><option value="90" ${state.settings.hydrationInterval==90?"selected":""}>1h30</option><option value="120" ${state.settings.hydrationInterval==120?"selected":""}>2 horas</option></select></label></section>
-  `);
+/* =========================================================
+   EDIÇÃO
+   ========================================================= */
+
+function editItem(
+  type,
+  id
+) {
+  const map = {
+    compromisso:
+      "compromissos",
+    tarefa:
+      "tarefas"
+  };
+
+  const key =
+    map[type];
+
+  const item =
+    state.data[key]?.find(
+      (x) => x.id === id
+    );
+
+  if (!item) return;
+
+  if (
+    type === "compromisso"
+  ) {
+    openModal(
+      "Editar compromisso",
+
+      `
+        ${field(
+          "Título",
+          "title",
+          "text",
+          item.title,
+          "required"
+        )}
+
+        ${field(
+          "Data",
+          "date",
+          "date",
+          item.date,
+          "required"
+        )}
+
+        ${field(
+          "Horário",
+          "time",
+          "time",
+          item.time || ""
+        )}
+
+        ${field(
+          "Local",
+          "location",
+          "text",
+          item.location || ""
+        )}
+      `,
+
+      {
+        submit: "Salvar"
+      }
+    );
+  }
+
+  if (
+    type === "tarefa"
+  ) {
+    openModal(
+      "Editar tarefa",
+
+      `
+        ${field(
+          "Tarefa",
+          "title",
+          "text",
+          item.title,
+          "required"
+        )}
+
+        ${selectField(
+          "Prioridade",
+          "priority",
+          [
+            {
+              value: "",
+              label: "Normal"
+            },
+            {
+              value: "Alta",
+              label: "Alta"
+            },
+            {
+              value: "Média",
+              label: "Média"
+            },
+            {
+              value: "Baixa",
+              label: "Baixa"
+            }
+          ],
+          item.priority || ""
+        )}
+
+        ${field(
+          "Prazo",
+          "date",
+          "date",
+          item.date || ""
+        )}
+      `,
+
+      {
+        submit: "Salvar"
+      }
+    );
+  }
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    Object.assign(
+      item,
+      Object.fromEntries(
+        f.entries()
+      )
+    );
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Alterações salvas."
+    );
+  };
 }
 
-function v3FinancePage() {
-  const data=state.data.financas, income=data.filter(x=>x.type==="receita").reduce((s,x)=>s+num(x.value),0),expense=data.filter(x=>x.type==="despesa").reduce((s,x)=>s+num(x.value),0),balance=income-expense,status=v3FinanceStatus(),cats={};
-  data.filter(x=>x.type==="despesa").forEach(x=>cats[x.category||"Outros"]=(cats[x.category||"Outros"]||0)+num(x.value));
-  const rows=Object.entries(cats).sort((a,b)=>b[1]-a[1]),max=Math.max(1,...rows.map(x=>x[1]));
-  return layout(`<div class="page-header"><div><div class="eyebrow">ORGANIZAÇÃO FINANCEIRA</div><h1>Finanças</h1><p class="muted">Gastos por categoria e teto de gastos.</p></div><div class="header-actions"><button class="primary" data-action="add-income">+ Receita</button><button class="secondary" data-action="add-expense">+ Despesa</button></div></div>
-    <div class="stat-grid mini">${stat(money(income),"Receitas")}${stat(money(expense),"Despesas")}${stat(money(balance),"Saldo")}</div>
-    <section class="card"><div class="section-title"><div><span class="eyebrow">CONTROLE</span><h3>Teto de gastos</h3></div><button class="text-btn" data-action="v3-finance-limit">Configurar</button></div>${status.limit?`<strong class="limit-number">${money(status.total)}</strong><span class="muted"> de ${money(status.limit)}</span><div class="progress ${status.pct>=100?"danger-progress":""}"><span style="width:${Math.min(100,status.pct)}%"></span></div><div class="limit-foot"><span>${Math.round(status.pct)}% utilizado</span><span>aviso em ${state.settings.financeWarning}%</span></div>${status.warning?`<div class="inline-alert ${status.level}">⚠ ${esc(status.message)}</div>`:""}`:`<div class="empty-inline">Defina um teto mensal para receber alertas. <button data-action="v3-finance-limit">Configurar teto</button></div>`}</section>
-    <section class="card"><div class="section-title"><div><span class="eyebrow">VISÃO DOS GASTOS</span><h3>Gastos por categoria</h3></div></div>${rows.length?`<div class="bars">${rows.map(([c,v])=>`<div class="bar-row"><div><span>${esc(c)}</span><b>${money(v)}</b></div><div class="bar"><span style="width:${Math.round(v/max*100)}%"></span></div></div>`).join("")}</div>`:`<p class="muted">Cadastre despesas com categorias para visualizar o gráfico.</p>`}</section>
-    <section class="card"><div class="section-title"><h3>Movimentações</h3></div><div class="stack">${data.length?data.slice().reverse().map(x=>`<div class="item-row"><div class="finance-icon ${x.type}">${x.type==="receita"?"↗":"↘"}</div><div class="item-main"><b>${esc(x.title)}</b><span>${formatDate(x.date)} · ${esc(x.category||"Outros")}</span></div><strong class="${x.type}">${x.type==="receita"?"+":"-"} ${money(x.value)}</strong><button class="icon-btn" data-action="delete-finance" data-id="${x.id}">🗑</button></div>`).join(""):emptyState("Nenhuma movimentação registrada.","Adicionar despesa","add-expense")}</div></section>
-  `);
+/* =========================================================
+   REMOÇÃO
+   ========================================================= */
+
+function removeItem(
+  key,
+  id,
+  message = "Item removido."
+) {
+  if (!state.data[key]) {
+    return;
+  }
+
+  state.data[key] =
+    state.data[key].filter(
+      (x) => x.id !== id
+    );
+
+  saveState();
+  render();
+
+  toast(message);
 }
 
-const v3OriginalRender = render;
-render = function() {
-  v3Normalize();
-  const pages={inicio:v3Home,agenda:v3AgendaPage,assistente:renderAssistant,explorar:explore,perfil:profile,tarefas:tasksPage,compras:v3ShoppingPage,estudos:v3StudiesPage,treinos:v3WorkoutPage,hidratacao:v3HydrationPage,financas:v3FinancePage,objetivos:goalsPage,familia:familyPage};
-  const app=document.getElementById("app");
-  if(app) app.innerHTML=pages[state.page]?pages[state.page]():v3Home();
+/* =========================================================
+   AÇÕES
+   ========================================================= */
+
+function handleAction(
+  action,
+  el
+) {
+  if (
+    action === "quick-add"
+  ) {
+    openModal(
+      "O que você quer adicionar?",
+
+      `
+        <div class="quick-actions">
+
+          ${[
+            [
+              "compromissos",
+              "▣",
+              "Compromisso"
+            ],
+            [
+              "tarefas",
+              "✓",
+              "Tarefa"
+            ],
+            [
+              "compras",
+              "🛒",
+              "Compra"
+            ],
+            [
+              "estudos",
+              "▤",
+              "Estudo"
+            ],
+            [
+              "treinos",
+              "♢",
+              "Treino"
+            ],
+            [
+              "hidratacao",
+              "◉",
+              "Água"
+            ],
+            [
+              "alimentacao",
+              "🍽️",
+              "Refeição"
+            ],
+            [
+              "financas",
+              "R$",
+              "Finança"
+            ],
+            [
+              "objetivos",
+              "◎",
+              "Objetivo"
+            ],
+            [
+              "familia",
+              "♧",
+              "Pessoa"
+            ]
+          ]
+            .map(
+              (x) => `
+                <button
+                  type="button"
+                  class="quick-option"
+                  data-action="quick-option"
+                  data-key="${x[0]}"
+                >
+                  <span>${x[1]}</span>
+                  ${x[2]}
+                </button>
+              `
+            )
+            .join("")}
+
+        </div>
+      `,
+
+      {
+        submit: "Fechar"
+      }
+    );
+
+    modal.querySelector(
+      ".modal-footer"
+    ).style.display =
+      "none";
+
+    return;
+  }
+
+  if (
+    action === "quick-option"
+  ) {
+    const key =
+      el.dataset.key;
+
+    closeModal();
+    addForm(key);
+
+    return;
+  }
+
+  if (
+    action === "close-modal"
+  ) {
+    closeModal();
+    return;
+  }
+
+  if (
+    action.startsWith("add-")
+  ) {
+    addForm(
+      action.slice(4)
+    );
+
+    return;
+  }
+
+  const id =
+    el.dataset.id;
+
+  if (
+    action === "toggle-tarefa"
+  ) {
+    const item =
+      state.data.tarefas.find(
+        (x) => x.id === id
+      );
+
+    if (item) {
+      item.done =
+        !item.done;
+    }
+
+    saveState();
+    render();
+
+    return;
+  }
+
+  if (
+    action ===
+    "toggle-estudo"
+  ) {
+    const item =
+      state.data.estudos.find(
+        (x) => x.id === id
+      );
+
+    if (item) {
+      item.done =
+        !item.done;
+    }
+
+    saveState();
+    render();
+
+    return;
+  }
+
+  if (
+    action ===
+    "toggle-item-compra"
+  ) {
+    const lista =
+      state.data.compras.find(
+        (x) =>
+          x.id ===
+          el.dataset.listId
+      );
+
+    const item =
+      lista?.items?.find(
+        (x) =>
+          x.id === id
+      );
+
+    if (item) {
+      item.done =
+        !item.done;
+    }
+
+    saveState();
+    render();
+
+    return;
+  }
+
+  if (
+    action ===
+    "open-lista-compras"
+  ) {
+    currentShoppingList =
+      id;
+
+    currentPage =
+      "compras";
+
+    render();
+
+    return;
+  }
+
+  if (
+    action ===
+    "back-compras"
+  ) {
+    currentShoppingList =
+      null;
+
+    currentPage =
+      "compras";
+
+    render();
+
+    return;
+  }
+
+  if (
+    action ===
+    "add-item-compra"
+  ) {
+    addItemCompra(id);
+    return;
+  }
+
+  if (
+    action ===
+    "edit-item-compra"
+  ) {
+    editItemCompra(
+      el.dataset.listId,
+      id
+    );
+
+    return;
+  }
+
+  if (
+    action ===
+    "delete-item-compra"
+  ) {
+    const lista =
+      state.data.compras.find(
+        (x) =>
+          x.id ===
+          el.dataset.listId
+      );
+
+    if (!lista) return;
+
+    lista.items =
+      (lista.items || [])
+        .filter(
+          (x) => x.id !== id
+        );
+
+    saveState();
+    render();
+
+    toast(
+      "Item removido."
+    );
+
+    return;
+  }
+
+  if (
+    action ===
+    "delete-lista-compras"
+  ) {
+    if (
+      confirm(
+        "Excluir esta lista de compras?"
+      )
+    ) {
+      state.data.compras =
+        state.data.compras.filter(
+          (x) => x.id !== id
+        );
+
+      currentShoppingList =
+        null;
+
+      saveState();
+      render();
+
+      toast(
+        "Lista excluída."
+      );
+    }
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-compromisso"
+  ) {
+    editItem(
+      "compromisso",
+      id
+    );
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-tarefa"
+  ) {
+    editItem(
+      "tarefa",
+      id
+    );
+
+    return;
+  }
+
+  if (
+    action ===
+    "add-profile-photo"
+  ) {
+    addProfilePhoto();
+    return;
+  }
+
+  if (
+    action ===
+    "delete-profile-photo"
+  ) {
+    deleteProfilePhoto();
+    return;
+  }
+
+  if (
+    action ===
+    "config-alimentacao"
+  ) {
+    configurarAlimentacao();
+    return;
+  }
+
+  if (
+    action ===
+    "edit-alimentacao"
+  ) {
+    const item =
+      state.data.alimentacao.find(
+        (x) => x.id === id
+      );
+
+    if (item) {
+      addMealForm(item);
+    }
+
+    return;
+  }
+
+  if (
+    action ===
+    "delete-alimentacao"
+  ) {
+    removeItem(
+      "alimentacao",
+      id,
+      "Refeição removida."
+    );
+
+    return;
+  }
+
+  if (
+    action ===
+    "config-hidratacao"
+  ) {
+    configurarHidratacao();
+    return;
+  }
+
+  if (
+    action ===
+    "quick-water"
+  ) {
+    state.data.hidratacao.push({
+      id: uid("h"),
+      amount:
+        Number(
+          el.dataset.value
+        ),
+      createdAt:
+        new Date().toISOString()
+    });
+
+    saveState();
+    render();
+
+    toast(
+      `+${el.dataset.value} ml registrados.`
+    );
+
+    return;
+  }
+
+  if (
+    action ===
+    "reset-hidratacao"
+  ) {
+    if (
+      confirm(
+        "Limpar todos os registros de hidratação?"
+      )
+    ) {
+      state.data.hidratacao =
+        state.data.hidratacao.filter(
+          (x) =>
+            String(
+              x.createdAt || ""
+            ).slice(0, 10) !==
+            todayISO()
+        );
+
+      saveState();
+      render();
+
+      toast(
+        "Registros de hoje limpos."
+      );
+    }
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-estudo"
+  ) {
+    const item =
+      state.data.estudos.find(
+        (x) => x.id === id
+      );
+
+    if (!item) return;
+
+    openModal(
+      "Editar sessão de estudo",
+
+      `
+        ${field(
+          "Matéria",
+          "subject",
+          "text",
+          item.subject,
+          "required"
+        )}
+
+        ${field(
+          "Tema",
+          "topic",
+          "text",
+          item.topic || ""
+        )}
+
+        ${field(
+          "Data",
+          "date",
+          "date",
+          item.date || ""
+        )}
+
+        ${field(
+          "Horário",
+          "time",
+          "time",
+          item.time || ""
+        )}
+
+        ${field(
+          "Duração (min)",
+          "duration",
+          "number",
+          item.duration || ""
+        )}
+      `,
+
+      {
+        submit: "Salvar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      Object.assign(
+        item,
+        Object.fromEntries(
+          f.entries()
+        )
+      );
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Estudo atualizado."
+      );
+    };
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-treino"
+  ) {
+    const item =
+      state.data.treinos.find(
+        (x) => x.id === id
+      );
+
+    if (!item) return;
+
+    openModal(
+      "Editar treino",
+
+      `
+        ${field(
+          "Nome",
+          "name",
+          "text",
+          item.name,
+          "required"
+        )}
+
+        ${field(
+          "Tipo",
+          "type",
+          "text",
+          item.type || ""
+        )}
+
+        ${field(
+          "Data",
+          "date",
+          "date",
+          item.date || ""
+        )}
+
+        ${field(
+          "Horário",
+          "time",
+          "time",
+          item.time || ""
+        )}
+
+        ${field(
+          "Duração (min)",
+          "duration",
+          "number",
+          item.duration || ""
+        )}
+      `,
+
+      {
+        submit: "Salvar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      Object.assign(
+        item,
+        Object.fromEntries(
+          f.entries()
+        )
+      );
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Treino atualizado."
+      );
+    };
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-financa"
+  ) {
+    const item =
+      state.data.financas.find(
+        (x) => x.id === id
+      );
+
+    if (item) {
+      addFinanceForm(item);
+    }
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-objetivo"
+  ) {
+    const item =
+      state.data.objetivos.find(
+        (x) => x.id === id
+      );
+
+    if (item) {
+      addGoalForm(item);
+    }
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-familia"
+  ) {
+    const item =
+      state.data.familia.find(
+        (x) => x.id === id
+      );
+
+    if (item) {
+      addFamilyForm(item);
+    }
+
+    return;
+  }
+
+  if (
+    action ===
+    "progress-objetivo"
+  ) {
+    const item =
+      state.data.objetivos.find(
+        (x) => x.id === id
+      );
+
+    if (!item) return;
+
+    openModal(
+      "Atualizar progresso",
+
+      field(
+        "Progresso (%)",
+        "progress",
+        "number",
+        item.progress,
+        "min='0' max='100' required"
+      ),
+
+      {
+        submit: "Atualizar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      item.progress =
+        Number(
+          new FormData(
+            e.target
+          ).get("progress")
+        );
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Progresso atualizado."
+      );
+    };
+
+    return;
+  }
+
+  if (
+    action ===
+    "assistant-question"
+  ) {
+    const q =
+      el.dataset.question;
+
+    let response = "";
+
+    if (
+      q.includes("hoje")
+    ) {
+      response =
+        `Hoje você tem ${
+          state.data.compromissos.filter(
+            (x) =>
+              x.date ===
+              todayISO()
+          ).length
+        } compromisso(s) na agenda e ${
+          state.data.tarefas.filter(
+            (x) => !x.done
+          ).length
+        } tarefa(s) pendente(s).`;
+    } else if (
+      q.includes("pendentes")
+    ) {
+      response =
+        `Você tem ${
+          state.data.tarefas
+            .filter(
+              (x) => !x.done
+            )
+            .map(
+              (x) => x.title
+            )
+            .join(", ") ||
+          "nenhuma tarefa pendente"
+        }.`;
+    } else {
+      response =
+        `Sua rotina tem ${
+          state.data.tarefas.filter(
+            (x) => !x.done
+          ).length
+        } tarefa(s) pendente(s), ${
+          state.data.objetivos
+            .length
+        } objetivo(s) e ${
+          state.data.compras.reduce(
+            (total, lista) =>
+              total +
+              (lista.items || [])
+                .filter(
+                  (x) => !x.done
+                ).length,
+            0
+          )
+        } item(ns) pendente(s) nas compras.`;
+    }
+
+    const box =
+      document.getElementById(
+        "assistant-response"
+      );
+
+    if (box) {
+      box.innerHTML = `
+        <strong>
+          LiDire
+        </strong>
+
+        <p>
+          ${esc(response)}
+        </p>
+      `;
+    }
+
+    return;
+  }
+
+  if (
+    action ===
+    "edit-profile"
+  ) {
+    openModal(
+      "Editar perfil",
+
+      `
+        ${field(
+          "Nome",
+          "name",
+          "text",
+          state.user.name,
+          "required"
+        )}
+
+        ${field(
+          "E-mail",
+          "email",
+          "email",
+          state.user.email || ""
+        )}
+
+        ${field(
+          "Idade",
+          "age",
+          "number",
+          state.user.age || ""
+        )}
+
+        ${field(
+          "Telefone",
+          "phone",
+          "tel",
+          state.user.phone || ""
+        )}
+      `,
+
+      {
+        submit: "Salvar perfil"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = (e) => {
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.user = {
+        ...state.user,
+        ...Object.fromEntries(
+          f.entries()
+        )
+      };
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Perfil atualizado."
+      );
+    };
+
+    return;
+  }
+
+  if (
+    action ===
+    "clear-local"
+  ) {
+    if (
+      confirm(
+        "Isso apagará os dados salvos neste dispositivo. Continuar?"
+      )
+    ) {
+      state =
+        cloneDefaultState();
+
+      saveState();
+      render();
+
+      toast(
+        "Dados locais redefinidos."
+      );
+    }
+
+    return;
+  }
+
+  const deletes = {
+    "delete-compromisso": [
+      "compromissos",
+      "Compromisso removido."
+    ],
+
+    "delete-tarefa": [
+      "tarefas",
+      "Tarefa removida."
+    ],
+
+    "delete-estudo": [
+      "estudos",
+      "Registro removido."
+    ],
+
+    "delete-treino": [
+      "treinos",
+      "Treino removido."
+    ],
+
+    "delete-hidratacao": [
+      "hidratacao",
+      "Registro removido."
+    ],
+
+    "delete-financa": [
+      "financas",
+      "Lançamento removido."
+    ],
+
+    "delete-objetivo": [
+      "objetivos",
+      "Objetivo removido."
+    ],
+
+    "delete-familia": [
+      "familia",
+      "Pessoa removida."
+    ]
+  };
+
+  if (deletes[action]) {
+    removeItem(
+      ...deletes[action],
+      id
+    );
+
+    return;
+  }
+}
+
+/* =========================================================
+   EDIÇÃO DE ITEM DE COMPRAS
+   ========================================================= */
+
+function editItemCompra(
+  listId,
+  itemId
+) {
+  const lista =
+    state.data.compras.find(
+      (x) => x.id === listId
+    );
+
+  const item =
+    lista?.items?.find(
+      (x) => x.id === itemId
+    );
+
+  if (!lista || !item) {
+    return;
+  }
+
+  openModal(
+    "Editar item",
+
+    `
+      ${field(
+        "Item",
+        "name",
+        "text",
+        item.name,
+        "required"
+      )}
+
+      ${field(
+        "Quantidade",
+        "quantity",
+        "text",
+        item.quantity || ""
+      )}
+
+      ${field(
+        "Categoria",
+        "category",
+        "text",
+        item.category || ""
+      )}
+    `,
+
+    {
+      submit: "Salvar"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = (e) => {
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    Object.assign(
+      item,
+      Object.fromEntries(
+        f.entries()
+      )
+    );
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Item atualizado."
+    );
+  };
+}
+
+/* =========================================================
+   EVENTOS
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+  (event) => {
+    const pageEl =
+      event.target.closest(
+        "[data-page]"
+      );
+
+    if (pageEl) {
+      event.preventDefault();
+
+      currentPage =
+        pageEl.dataset.page;
+
+      currentShoppingList =
+        null;
+
+      render();
+
+      return;
+    }
+
+    const actionEl =
+      event.target.closest(
+        "[data-action]"
+      );
+
+    if (actionEl) {
+      event.preventDefault();
+
+      handleAction(
+        actionEl.dataset.action,
+        actionEl
+      );
+    }
+  }
+);
+
+document.addEventListener(
+  "click",
+  (event) => {
+    if (
+      event.target.classList.contains(
+        "modal-backdrop"
+      )
+    ) {
+      closeModal();
+    }
+  }
+);
+
+/* =========================================================
+   API PÚBLICA DO LIDIRE
+   ========================================================= */
+
+window.LiDire = {
+  state: () => state,
+
+  save: saveState,
+
+  go: (page) => {
+    currentPage = page;
+    currentShoppingList = null;
+    render();
+  },
+
+  reset: () => {
+    state =
+      cloneDefaultState();
+
+    saveState();
+    render();
+  }
 };
 
-const v3OldActionHandler = handleAction;
-handleAction = function(action,el) {
-  const id=el?.dataset?.id;
-  if(action==="v3-close-modal"){v3CloseModal();return;}
-  if(action==="add-commitment"){v3AddCommitment();return;}
-  if(action==="edit-commitment"){const x=state.data.compromissos.find(v=>v.id===id);if(x)v3AddCommitment(x);return;}
-  if(action==="delete-commitment"){if(confirm("Excluir este compromisso?")){state.data.compromissos=state.data.compromissos.filter(x=>x.id!==id);persist();render();toast("Compromisso excluído.");}return;}
-  if(action==="v3-add-list"){v3AddShoppingList();return;}
-  if(action==="v3-edit-list"){const x=state.data.comprasListas.find(v=>v.id===id);if(x)v3AddShoppingList(x);return;}
-  if(action==="v3-delete-list"){if(confirm("Excluir esta lista e seus itens?")){state.data.comprasListas=state.data.comprasListas.filter(x=>x.id!==id);persist();render();toast("Lista excluída.");}return;}
-  if(action==="v3-add-item"){v3AddShoppingItem(id);return;}
-  if(action==="v3-toggle-item"){const l=state.data.comprasListas.find(x=>x.id===el.dataset.list),i=l?.items.find(x=>x.id===id);if(i){i.done=el.checked;persist();render();}return;}
-  if(action==="add-study"){v3AddStudy();return;}
-  if(action==="edit-study"){const x=state.data.estudos.find(v=>v.id===id);if(x)v3AddStudy(x);return;}
-  if(action==="v3-toggle-study"){const x=state.data.estudos.find(v=>v.id===id);if(x){x.done=!x.done;persist();render();}return;}
-  if(action==="delete-study"){if(confirm("Excluir esta matéria?")){state.data.estudos=state.data.estudos.filter(x=>x.id!==id);persist();render();toast("Matéria excluída.");}return;}
-  if(action==="add-workout"){v3AddWorkout();return;}
-  if(action==="edit-workout"){const x=state.data.treinos.find(v=>v.id===id);if(x)v3AddWorkout(x);return;}
-  if(action==="delete-workout"){if(confirm("Excluir este treino?")){state.data.treinos=state.data.treinos.filter(x=>x.id!==id);persist();render();toast("Treino excluído.");}return;}
-  if(action==="v3-add-exercise-row"){const box=document.getElementById("v3ExerciseRows");if(box){const i=box.querySelectorAll(".v3-exercise-row").length;box.insertAdjacentHTML("beforeend",v3ExerciseRow(i,{}));}return;}
-  if(action==="add-water"){v3AddWater();return;}
-  if(action==="quick-water"){state.data.hidratacao.push({id:uid("agua"),amount:num(el.dataset.value),date:today(),time:new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})});persist();render();toast(`+${el.dataset.value} ml registrados.`);return;}
-  if(action==="delete-water"){state.data.hidratacao=state.data.hidratacao.filter(x=>x.id!==id);persist();render();return;}
-  if(action==="reset-water"){state.data.hidratacao=state.data.hidratacao.filter(x=>x.date!==today());persist();render();toast("Registros de hoje limpos.");return;}
-  if(action==="v3-hydration-toggle"){if(el.checked){state.settings.hydrationReminder=true;persist();v3StartReminder();render();toast("Lembrete de hidratação ativado.");}else{state.settings.hydrationReminder=false;persist();v3StartReminder();render();toast("Lembrete desativado.");}return;}
-  if(action==="v3-hydration-interval"){return;}
-  if(action==="add-income"){v3AddFinance("receita");return;}
-  if(action==="add-expense"){v3AddFinance("despesa");return;}
-  if(action==="v3-finance-limit"){v3FinanceLimit();return;}
-  if(action==="delete-finance"){if(confirm("Excluir esta movimentação?")){state.data.financas=state.data.financas.filter(x=>x.id!==id);state.data.fin.receitas=state.data.financas.filter(x=>x.type==="receita");state.data.fin.despesas=state.data.financas.filter(x=>x.type==="despesa");persist();render();toast("Movimentação removida.");}return;}
-  return v3OldActionHandler(action,el);
-};
+/* =========================================================
+   INICIALIZAÇÃO
+   ========================================================= */
 
-function v3AddFinance(type) {
-  v3Modal(type==="receita"?"Nova receita":"Nova despesa",`${v3Field("Descrição","title","","text","required")}${v3Field("Valor","value","","number",'step="0.01" min="0.01" required')}${v3Field("Categoria","category",type==="despesa"?"Alimentação":"Renda")}${v3Field("Data","date",today(),"date","required")}`,"Salvar",fd=>{
-    const x={id:uid(type),type,title:fd.get("title"),value:num(fd.get("value")),category:fd.get("category")||"Outros",date:fd.get("date")};
-    state.data.financas.push(x);
-    if(!state.data.fin)state.data.fin={receitas:[],despesas:[]};
-    state.data.fin[type==="receita"?"receitas":"despesas"].push(x);
-    persist();v3CloseModal();render();toast(type==="receita"?"Receita adicionada.":"Despesa adicionada.");
-  });
-}
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+    render();
+  }
+);
 
-let v3ReminderTimer=null;
-function v3StartReminder(){
-  clearInterval(v3ReminderTimer);
-  if(!state.settings.hydrationReminder)return;
-  const ms=Math.max(15,num(state.settings.hydrationInterval)||60)*60000;
-  v3ReminderTimer=setInterval(()=>{
-    toast("💧 Hora de beber água!","reminder");
-    if("Notification" in window && Notification.permission==="granted") new Notification("LiDire — Hidratação",{body:"Hora de beber água!"});
-  },ms);
-}
-document.addEventListener("change",async e=>{
-  if(e.target.dataset.action==="v3-hydration-interval"){state.settings.hydrationInterval=num(e.target.value)||60;persist();v3StartReminder();toast("Intervalo atualizado.");}
-  if(e.target.dataset.action==="v3-hydration-toggle" && e.target.checked && "Notification" in window && Notification.permission==="default"){try{await Notification.requestPermission();}catch{}}
-});
-v3StartReminder();
-window.LiDireV3={version:LIDIRE_V3,render,persist};
-render();
+if (
+  document.readyState !==
+  "loading"
+) {
+  render();
+        }
