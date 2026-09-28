@@ -2732,8 +2732,9 @@ function explorar() {
    ========================================================= */
 
 function perfil() {
-  return appShell(`
+  const hasPhoto = !!state.user.photo;
 
+  return appShell(`
     ${pageHeader(
       "MINHA CONTA",
       "Perfil",
@@ -2743,22 +2744,76 @@ function perfil() {
     <div class="profile-card">
 
       <div class="profile-avatar">
-
         ${
-          state.user.photo
-            ? `
-              <img
-                class="profile-photo-preview"
-                src="${esc(state.user.photo)}"
-                alt="Foto de perfil"
-              >
-            `
-            : esc(
-                (state.user.name || "A")
-                  .charAt(0)
-                  .toUpperCase()
-              )
+          hasPhoto
+            ? `<img src="${esc(state.user.photo)}" alt="Foto de perfil">`
+            : esc((state.user.name || "A").charAt(0).toUpperCase())
         }
+      </div>
+
+      <h2>${esc(state.user.name || "Seu nome")}</h2>
+
+      <p>
+        ${esc(state.user.email || "Adicione seu e-mail")}
+      </p>
+
+      <button
+        class="primary-button"
+        data-action="edit-profile"
+      >
+        ${icon("edit")} Editar perfil
+      </button>
+
+    </div>
+
+    <div class="settings-card">
+
+      <button data-action="edit-profile">
+        <span>✎</span>
+
+        <div>
+          <strong>Dados pessoais</strong>
+          <small>Nome, e-mail, idade e telefone</small>
+        </div>
+
+        ${icon("arrow")}
+      </button>
+
+
+      <button data-action="profile-photo">
+        <span>📷</span>
+
+        <div>
+          <strong>Foto de perfil</strong>
+
+          <small>
+            ${hasPhoto
+              ? "Alterar ou excluir"
+              : "Adicionar uma foto"}
+          </small>
+        </div>
+
+        ${icon("arrow")}
+      </button>
+
+
+      <button data-action="clear-local">
+        <span>↺</span>
+
+        <div>
+          <strong>Redefinir dados locais</strong>
+
+          <small>
+            Apaga os dados salvos neste dispositivo
+          </small>
+        </div>
+
+        ${icon("arrow")}
+      </button>
+
+    </div>
+  `);
+}
 
       </div>
 
