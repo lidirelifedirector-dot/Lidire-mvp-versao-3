@@ -13,41 +13,31 @@ const defaultState = {
     compromissos: [],
     tarefas: [],
     compras: [],
-
     estudos: [],
     treinos: [],
-
     hidratacao: [],
-    hidratacaoConfig: {
-      dailyGoal: 2000,
-      intervalMinutes: 120,
-      intervalAmount: 250
-    },
-
     alimentacao: [],
-    alimentacaoConfig: {
-      dailyCalories: 2000,
-      dietFoods: []
-    },
-
     financas: [],
-    financeBudgets: {},
-
     objetivos: [],
     familia: []
+  },
+
+  settings: {
+    hydrationGoal: 2000,
+    hydrationInterval: 2,
+    hydrationPeriodAmount: 250,
+    calorieGoal: 2000,
+    financeLimits: {}
   }
 };
 
 let state = loadState();
 let currentPage = "inicio";
 let currentShoppingList = null;
-let currentStudyId = null;
-let currentTrainingId = null;
-let currentGoalId = null;
 let modal = null;
 
-function cloneDefault() {
-  return JSON.parse(JSON.stringify(defaultState));
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function loadState() {
@@ -55,11 +45,11 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
 
     if (!saved) {
-      return cloneDefault();
+      return clone(defaultState);
     }
 
     return {
-      ...cloneDefault(),
+      ...clone(defaultState),
       ...saved,
 
       user: {
@@ -69,26 +59,17 @@ function loadState() {
 
       data: {
         ...defaultState.data,
-        ...(saved.data || {}),
+        ...(saved.data || {})
+      },
 
-        hidratacaoConfig: {
-          ...defaultState.data.hidratacaoConfig,
-          ...((saved.data || {}).hidratacaoConfig || {})
-        },
-
-        alimentacaoConfig: {
-          ...defaultState.data.alimentacaoConfig,
-          ...((saved.data || {}).alimentacaoConfig || {})
-        },
-
-        financeBudgets: {
-          ...((saved.data || {}).financeBudgets || {})
-        }
+      settings: {
+        ...defaultState.settings,
+        ...(saved.settings || {})
       }
     };
   } catch (error) {
-    console.error("Erro ao carregar LiDire:", error);
-    return cloneDefault();
+    console.error("Erro ao carregar dados:", error);
+    return clone(defaultState);
   }
 }
 
@@ -121,30 +102,21 @@ function money(value) {
 function dateBR(value) {
   if (!value) return "";
 
-  const parts = String(value).split("-");
+  const [y, m, d] = String(value).split("-");
 
-  if (parts.length !== 3) {
-    return value;
-  }
-
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return y && m && d ? `${d}/${m}/${y}` : value;
 }
 
 function todayISO() {
-  const date = new Date();
-  const offset = date.getTimezoneOffset();
-
-  return new Date(date.getTime() - offset * 60000)
-    .toISOString()
-    .slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
 }
 
-function timeNow() {
+function nowTime() {
   return new Date().toTimeString().slice(0, 5);
 }
 
 function toast(message, type = "success") {
-  document.querySelectorAll(".lidire-toast").forEach(el => el.remove());
+  document.querySelectorAll(".lidire-toast").forEach((el) => el.remove());
 
   const el = document.createElement("div");
 
@@ -172,6 +144,7 @@ function icon(name) {
     wallet: "R$",
     target: "◎",
     family: "♧",
+    food: "🍽",
     spark: "✦",
     user: "◯",
     plus: "+",
@@ -181,22 +154,106 @@ function icon(name) {
     clock: "◷",
     search: "⌕",
     back: "‹",
-    food: "🍽",
     link: "🔗",
     note: "📝",
-    photo: "📷"
+    fire: "🔥"
   };
 
   return icons[name] || "•";
 }
 
-const modules = [
-  ["agenda", "Agenda", "Compromissos e horários", "calendar", "agenda"],
-  ["tarefas", "Tarefas", "Tudo o que precisa ser feito", "check", "tarefas"],
-  ["compras", "Compras", "Listas para não esquecer", "cart", "compras"],
-  ["estudos", "Estudos", "Organize seu aprendizado", "book", "estudos"],
-  ["treinos", "Treinos", "Movimente-se e acompanhe", "dumbbell", "treinos"],
-  ["hidratacao", "Hidratação", "Cuide da sua rotina", "drop", "hidratacao"],
-  ["alimentacao", "Alimentação", "Refeições e calorias", "food", "alimentacao"],
-  ["financas", "Finanças", "Entradas e gastos", "wallet", "financas"],
-  ["objetivos
+/* =========================================================
+   ESTILO EXTRA INSERIDO PELO PRÓPRIO JS
+   ========================================================= */
+
+function injectLiDireStyles() {
+  if (document.getElementById("lidire-extra-styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "lidire-extra-styles";
+
+  style.textContent = `
+    .task-priority {
+      width: 7px;
+      min-width: 7px;
+      height: 46px;
+      border-radius: 8px;
+      margin-right: 10px;
+    }
+
+    .priority-baixa {
+      background: #22c55e;
+    }
+
+    .priority-normal {
+      background: #3b82f6;
+    }
+
+    .priority-média {
+      background: #facc15;
+    }
+
+    .priority-alta {
+      background: #ef4444;
+    }
+
+    .task-content {
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    .finance-chart {
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .chart-row {
+      margin-bottom: 15px;
+    }
+
+    .chart-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .chart-bar {
+      height: 12px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+    }
+
+    .chart-bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg,#8b5cf6,#ec4899);
+    }
+
+    .limit-warning {
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .limit-ok {
+      color: #22c55e;
+    }
+
+    .limit-danger {
+      color: #ef4444;
+    }
+
+    .notes-box {
+      min-height: 150px;
+    }
+
+    .exercise-animation {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 130px;
+      font-size: 70px;
+      animation: lid
