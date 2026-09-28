@@ -2815,6 +2815,106 @@ function perfil() {
   `);
 }
 
+function profilePhotoModal() {
+  const hasPhoto = !!state.user.photo;
+
+  openModal(
+    hasPhoto ? "Foto de perfil" : "Adicionar foto",
+    `
+      ${
+        hasPhoto
+          ? `
+            <div class="profile-photo-preview">
+              <img
+                src="${esc(state.user.photo)}"
+                alt="Foto de perfil"
+              >
+            </div>
+          `
+          : ""
+      }
+
+      <div class="profile-photo-actions">
+
+        <label class="primary-button" style="cursor:pointer;">
+          📷 ${hasPhoto ? "Alterar foto" : "Adicionar foto"}
+
+          <input
+            id="profile-photo-input"
+            type="file"
+            accept="image/*"
+            style="display:none;"
+          >
+        </label>
+
+        ${
+          hasPhoto
+            ? `
+              <button
+                type="button"
+                class="ghost-button"
+                data-action="delete-profile-photo"
+              >
+                🗑 Excluir foto
+              </button>
+            `
+            : ""
+        }
+
+      </div>
+
+      <p class="muted">
+        Escolha uma imagem do seu dispositivo.
+      </p>
+    `,
+    {
+      submit: "Fechar"
+    }
+  );
+
+  const form = modal.querySelector("#lidire-form");
+
+  /*
+   * Não precisamos salvar o formulário.
+   * A foto é processada diretamente no input.
+   */
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    closeModal();
+  };
+
+  const input = modal.querySelector("#profile-photo-input");
+
+  if (input) {
+    input.addEventListener("change", () => {
+
+      const file = input.files?.[0];
+
+      if (!file) return;
+
+      if (!file.type.startsWith("image/")) {
+        toast("Selecione uma imagem válida.", "error");
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = () => {
+
+        state.user.photo = reader.result;
+
+        saveState();
+        closeModal();
+        render();
+
+        toast("Foto de perfil atualizada.");
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+}
+
       </div>
 
       <h2>
