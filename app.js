@@ -3072,3 +3072,3099 @@ function selectField(
     </label>
   `;
           }
+
+/* =========================================================
+   FORMULÁRIOS DE ADIÇÃO
+   ========================================================= */
+
+function addForm(key) {
+
+  /* ---------------- AGENDA ---------------- */
+
+  if (key === "compromissos") {
+
+    openModal(
+      "Novo compromisso",
+
+      field(
+        "Título",
+        "title",
+        "text",
+        "",
+        "required"
+      ) +
+
+      field(
+        "Data",
+        "date",
+        "date",
+        todayISO(),
+        "required"
+      ) +
+
+      field(
+        "Horário",
+        "time",
+        "time",
+        nowTime()
+      ) +
+
+      field(
+        "Local",
+        "location"
+      ),
+
+      {
+        submit: "Adicionar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.compromissos.push({
+        id: uid("c"),
+        title: f.get("title"),
+        date: f.get("date"),
+        time: f.get("time"),
+        location: f.get("location")
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Compromisso adicionado."
+      );
+    };
+
+    return;
+  }
+
+  /* ---------------- TAREFAS ---------------- */
+
+  if (key === "tarefas") {
+
+    openModal(
+      "Nova tarefa",
+
+      field(
+        "Tarefa",
+        "title",
+        "text",
+        "",
+        "required"
+      ) +
+
+      selectField(
+        "Prioridade",
+        "priority",
+        [
+          "Baixa",
+          "Normal",
+          "Média",
+          "Alta"
+        ],
+        "Normal"
+      ) +
+
+      field(
+        "Data",
+        "date",
+        "date"
+      ) +
+
+      field(
+        "Horário",
+        "time",
+        "time"
+      ),
+
+      {
+        submit: "Adicionar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.tarefas.push({
+        id: uid("t"),
+        title: f.get("title"),
+        priority:
+          f.get("priority") ||
+          "Normal",
+        date: f.get("date"),
+        time: f.get("time"),
+        done: false
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Tarefa adicionada."
+      );
+    };
+
+    return;
+  }
+
+  /* ---------------- COMPRAS ---------------- */
+
+  if (key === "compras") {
+
+    openModal(
+      "Nova lista de compras",
+
+      field(
+        "Nome da lista",
+        "name",
+        "text",
+        "",
+        "required"
+      ),
+
+      {
+        submit: "Criar lista"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      if (!state.data.compras) {
+        state.data.compras = [];
+      }
+
+      const lista = {
+        id: uid("lista"),
+        name:
+          String(
+            f.get("name") || ""
+          ).trim(),
+        items: []
+      };
+
+      if (!lista.name) {
+        toast(
+          "Digite o nome da lista.",
+          "error"
+        );
+        return;
+      }
+
+      state.data.compras.push(
+        lista
+      );
+
+      saveState();
+
+      closeModal();
+
+      currentPage = "compras";
+      currentShoppingList = null;
+
+      render();
+
+      toast(
+        "Lista criada com sucesso."
+      );
+    };
+
+    return;
+  }
+
+  /* ---------------- ESTUDOS ---------------- */
+
+  if (key === "estudos") {
+
+    openModal(
+      "Novo estudo",
+
+      field(
+        "Matéria",
+        "subject",
+        "text",
+        "",
+        "required"
+      ) +
+
+      field(
+        "Assunto",
+        "topic"
+      ) +
+
+      field(
+        "Duração (min)",
+        "duration",
+        "number",
+        "",
+        "min=\"0\""
+      ) +
+
+      textareaField(
+        "Bloco de anotações",
+        "notes",
+        "",
+        'class="notes-box"'
+      ) +
+
+      field(
+        "Link da bibliografia",
+        "link",
+        "url",
+        "",
+        'placeholder="https://..."'
+      ),
+
+      {
+        submit: "Registrar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.estudos.push({
+        id: uid("e"),
+        subject:
+          f.get("subject"),
+        topic:
+          f.get("topic"),
+        duration:
+          f.get("duration"),
+        notes:
+          f.get("notes"),
+        link:
+          f.get("link"),
+        done: false
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Estudo registrado."
+      );
+    };
+
+    return;
+  }
+
+  /* ---------------- TREINOS ---------------- */
+
+  if (key === "treinos") {
+
+    openModal(
+      "Novo treino",
+
+      field(
+        "Nome",
+        "name",
+        "text",
+        "",
+        "required"
+      ) +
+
+      field(
+        "Tipo",
+        "type"
+      ) +
+
+      field(
+        "Duração (min)",
+        "duration",
+        "number",
+        "",
+        "min=\"0\""
+      ) +
+
+      field(
+        "Distância (km)",
+        "distance",
+        "number",
+        "",
+        'step="0.01" min="0"'
+      ) +
+
+      field(
+        "Pace",
+        "pace",
+        "text",
+        "",
+        'placeholder="Ex.: 6:30 min/km"'
+      ) +
+
+      textareaField(
+        "Observações",
+        "observations"
+      ),
+
+      {
+        submit: "Criar treino"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.treinos.push({
+        id: uid("tr"),
+        name: f.get("name"),
+        type: f.get("type"),
+        duration:
+          f.get("duration"),
+        distance:
+          f.get("distance"),
+        pace:
+          f.get("pace"),
+        observations:
+          f.get("observations"),
+        exercises: []
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Treino criado."
+      );
+    };
+
+    return;
+  }
+
+  /* ---------------- HIDRATAÇÃO ---------------- */
+
+  if (key === "hidratacao") {
+
+    openModal(
+      "Registrar água",
+
+      field(
+        "Quantidade (ml)",
+        "amount",
+        "number",
+        "300",
+        "required min=\"1\""
+      ),
+
+      {
+        submit: "Registrar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.hidratacao.push({
+        id: uid("h"),
+        amount:
+          Number(f.get("amount")),
+        date:
+          todayISO(),
+        createdAt:
+          new Date().toISOString()
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Hidratação registrada."
+      );
+    };
+
+    return;
+  }
+
+  /* ---------------- ALIMENTAÇÃO ---------------- */
+
+  if (key === "alimentacao") {
+    addMealForm();
+    return;
+  }
+
+  /* ---------------- FINANÇAS ---------------- */
+
+  if (key === "financas") {
+
+    openModal(
+      "Novo lançamento",
+
+      selectField(
+        "Tipo",
+        "type",
+        ["expense", "income"],
+        "expense"
+      ) +
+
+      field(
+        "Descrição",
+        "title",
+        "text",
+        "",
+        "required"
+      ) +
+
+      field(
+        "Valor",
+        "value",
+        "number",
+        "",
+        'step="0.01" min="0" required'
+      ) +
+
+      field(
+        "Categoria",
+        "category"
+      ) +
+
+      field(
+        "Data",
+        "date",
+        "date",
+        todayISO()
+      ),
+
+      {
+        submit: "Salvar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.financas.push({
+        id: uid("f"),
+        type: f.get("type"),
+        title: f.get("title"),
+        value:
+          Number(f.get("value")),
+        category:
+          f.get("category") ||
+          "Geral",
+        date:
+          f.get("date")
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Lançamento salvo."
+      );
+    };
+
+    return;
+  }
+
+  /* ---------------- OBJETIVOS ---------------- */
+
+  if (key === "objetivos") {
+
+    openGoalForm();
+    return;
+  }
+
+  /* ---------------- FAMÍLIA ---------------- */
+
+  if (key === "familia") {
+
+    openModal(
+      "Adicionar pessoa",
+
+      field(
+        "Nome",
+        "name",
+        "text",
+        "",
+        "required"
+      ) +
+
+      field(
+        "Relação",
+        "relation"
+      ) +
+
+      field(
+        "E-mail",
+        "email",
+        "email"
+      ),
+
+      {
+        submit: "Adicionar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.data.familia.push({
+        id: uid("m"),
+        name:
+          f.get("name"),
+        relation:
+          f.get("relation"),
+        email:
+          f.get("email")
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Pessoa adicionada."
+      );
+    };
+  }
+}
+
+/* =========================================================
+   REFEIÇÃO
+   ========================================================= */
+
+function addMealForm(existing = null) {
+
+  let foods =
+    existing?.foods
+      ? clone(existing.foods)
+      : [];
+
+  function renderFoodFields() {
+
+    const container =
+      modal.querySelector(
+        "#food-fields"
+      );
+
+    if (!container) return;
+
+    container.innerHTML =
+      foods.map((food, index) => `
+
+        <div class="diet-food-row">
+
+          <input
+            name="food-name-${index}"
+            placeholder="Alimento"
+            value="${esc(food.name || "")}"
+          >
+
+          <input
+            name="food-cal-${index}"
+            type="number"
+            min="0"
+            placeholder="kcal"
+            value="${Number(
+              food.calories || 0
+            )}"
+          >
+
+          <button
+            type="button"
+            data-remove-food="${index}"
+          >
+            ×
+          </button>
+
+        </div>
+
+      `).join("");
+
+    container
+      .querySelectorAll(
+        "[data-remove-food]"
+      )
+      .forEach(button => {
+
+        button.onclick = () => {
+
+          foods.splice(
+            Number(
+              button.dataset.removeFood
+            ),
+            1
+          );
+
+          renderFoodFields();
+        };
+      });
+  }
+
+  openModal(
+    existing
+      ? "Editar refeição"
+      : "Nova refeição",
+
+    field(
+      "Nome da refeição",
+      "name",
+      "text",
+      existing?.name || "",
+      "required"
+    ) +
+
+    field(
+      "Horário",
+      "time",
+      "time",
+      existing?.time ||
+      nowTime(),
+      "required"
+    ) +
+
+    `
+      <div class="form-field">
+
+        <span>
+          Alimentos e calorias
+        </span>
+
+        <div id="food-fields"></div>
+
+        <button
+          type="button"
+          class="ghost-button"
+          id="add-food-button"
+        >
+          + Adicionar alimento
+        </button>
+
+      </div>
+    `,
+
+    {
+      submit:
+        existing
+          ? "Salvar"
+          : "Adicionar"
+    }
+  );
+
+  renderFoodFields();
+
+  modal.querySelector(
+    "#add-food-button"
+  ).onclick = () => {
+
+    foods.push({
+      name: "",
+      calories: 0
+    });
+
+    renderFoodFields();
+  };
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    foods =
+      foods.map((food, index) => ({
+        name:
+          f.get(
+            `food-name-${index}`
+          ) || "",
+        calories:
+          Number(
+            f.get(
+              `food-cal-${index}`
+            ) || 0
+          )
+      }))
+      .filter(
+        food => food.name.trim()
+      );
+
+    if (!foods.length) {
+      toast(
+        "Adicione pelo menos um alimento.",
+        "error"
+      );
+      return;
+    }
+
+    const meal = {
+      id:
+        existing?.id ||
+        uid("meal"),
+      name:
+        f.get("name"),
+      time:
+        f.get("time"),
+      date:
+        existing?.date ||
+        todayISO(),
+      foods
+    };
+
+    if (existing) {
+
+      const index =
+        state.data.alimentacao
+          .findIndex(
+            x => x.id === existing.id
+          );
+
+      if (index >= 0) {
+        state.data.alimentacao[index] =
+          meal;
+      }
+
+    } else {
+      state.data.alimentacao.push(
+        meal
+      );
+    }
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      existing
+        ? "Refeição atualizada."
+        : "Refeição adicionada."
+    );
+  };
+}
+
+/* =========================================================
+   DIETA
+   ========================================================= */
+
+function addDietForm() {
+
+  const current =
+    state.settings.diet || {
+      name: "",
+      foods: []
+    };
+
+  let foods =
+    clone(current.foods || []);
+
+  function renderFoods() {
+
+    const container =
+      modal.querySelector(
+        "#diet-foods"
+      );
+
+    if (!container) return;
+
+    container.innerHTML =
+      foods.map((food, index) => `
+
+        <div class="diet-food-row">
+
+          <input
+            name="diet-food-${index}"
+            placeholder="Alimento"
+            value="${esc(food.name || "")}"
+          >
+
+          <input
+            name="diet-qty-${index}"
+            placeholder="Qtd."
+            value="${esc(food.quantity || "")}"
+          >
+
+          <button
+            type="button"
+            data-remove-diet="${index}"
+          >
+            ×
+          </button>
+
+        </div>
+
+      `).join("");
+
+    container
+      .querySelectorAll(
+        "[data-remove-diet]"
+      )
+      .forEach(btn => {
+
+        btn.onclick = () => {
+
+          foods.splice(
+            Number(
+              btn.dataset.removeDiet
+            ),
+            1
+          );
+
+          renderFoods();
+        };
+      });
+  }
+
+  openModal(
+    "Inserir dieta",
+
+    field(
+      "Nome da dieta",
+      "dietName",
+      "text",
+      current.name || ""
+    ) +
+
+    `
+      <div class="form-field">
+
+        <span>
+          Alimentos da dieta
+        </span>
+
+        <div id="diet-foods"></div>
+
+        <button
+          type="button"
+          class="ghost-button"
+          id="add-diet-food"
+        >
+          + Adicionar alimento
+        </button>
+
+      </div>
+    `,
+
+    {
+      submit: "Salvar dieta"
+    }
+  );
+
+  renderFoods();
+
+  modal.querySelector(
+    "#add-diet-food"
+  ).onclick = () => {
+
+    foods.push({
+      name: "",
+      quantity: ""
+    });
+
+    renderFoods();
+  };
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    foods =
+      foods.map((food, index) => ({
+        name:
+          f.get(
+            `diet-food-${index}`
+          ) || "",
+        quantity:
+          f.get(
+            `diet-qty-${index}`
+          ) || ""
+      }))
+      .filter(
+        food =>
+          food.name.trim()
+      );
+
+    state.settings.diet = {
+      name:
+        f.get("dietName"),
+      foods
+    };
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Dieta salva."
+    );
+  };
+}
+
+/* =========================================================
+   DIETA → LISTA DE COMPRAS
+   ========================================================= */
+
+function createShoppingListFromDiet() {
+
+  const diet =
+    state.settings.diet;
+
+  if (
+    !diet ||
+    !diet.foods ||
+    !diet.foods.length
+  ) {
+    toast(
+      "Cadastre os alimentos da dieta primeiro.",
+      "error"
+    );
+    return;
+  }
+
+  const list = {
+    id: uid("lista"),
+    name:
+      diet.name
+        ? `Compras - ${diet.name}`
+        : "Compras da dieta",
+    items:
+      diet.foods.map(food => ({
+        id: uid("item"),
+        name: food.name,
+        quantity:
+          food.quantity || "",
+        category: "Dieta",
+        done: false
+      }))
+  };
+
+  state.data.compras.push(
+    list
+  );
+
+  saveState();
+
+  currentPage = "compras";
+  currentShoppingList = list.id;
+
+  render();
+
+  toast(
+    "Lista criada a partir da dieta."
+  );
+}
+
+/* =========================================================
+   TREINO → EXERCÍCIO
+   ========================================================= */
+
+function addExerciseForm(treinoId, existing = null) {
+
+  openModal(
+    existing
+      ? "Editar exercício"
+      : "Adicionar exercício",
+
+    field(
+      "Exercício",
+      "name",
+      "text",
+      existing?.name || "",
+      "required"
+    ) +
+
+    field(
+      "Carga meta",
+      "loadGoal",
+      "text",
+      existing?.loadGoal || "",
+      'placeholder="Ex.: 20 kg"'
+    ) +
+
+    field(
+      "Carga efetivada",
+      "loadDone",
+      "text",
+      existing?.loadDone || "",
+      'placeholder="Ex.: 18 kg"'
+    ) +
+
+    field(
+      "Repetições meta",
+      "repsGoal",
+      "number",
+      existing?.repsGoal || "",
+      "min=\"0\""
+    ) +
+
+    field(
+      "Repetições efetivadas",
+      "repsDone",
+      "number",
+      existing?.repsDone || "",
+      "min=\"0\""
+    ),
+
+    {
+      submit:
+        existing
+          ? "Salvar"
+          : "Adicionar"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const treino =
+      state.data.treinos.find(
+        x => x.id === treinoId
+      );
+
+    if (!treino) return;
+
+    if (!treino.exercises) {
+      treino.exercises = [];
+    }
+
+    const exercise = {
+      id:
+        existing?.id ||
+        uid("exercise"),
+      name:
+        f.get("name"),
+      loadGoal:
+        f.get("loadGoal"),
+      loadDone:
+        f.get("loadDone"),
+      repsGoal:
+        f.get("repsGoal"),
+      repsDone:
+        f.get("repsDone")
+    };
+
+    if (existing) {
+
+      const index =
+        treino.exercises.findIndex(
+          x => x.id === existing.id
+        );
+
+      if (index >= 0) {
+        treino.exercises[index] =
+          exercise;
+      }
+
+    } else {
+
+      treino.exercises.push(
+        exercise
+      );
+
+    }
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      existing
+        ? "Exercício atualizado."
+        : "Exercício adicionado."
+    );
+  };
+}
+
+/* =========================================================
+   ANIMAÇÃO DE EXERCÍCIO
+   ========================================================= */
+
+function animateExercise(id) {
+
+  const allExercises =
+    state.data.treinos.flatMap(
+      treino =>
+        treino.exercises || []
+    );
+
+  const exercise =
+    allExercises.find(
+      x => x.id === id
+    );
+
+  if (!exercise) return;
+
+  openModal(
+    exercise.name,
+    `
+      <div class="exercise-animation">
+        🏃‍♀️
+      </div>
+
+      <p style="text-align:center">
+        Movimento demonstrativo
+        <br>
+        <strong>
+          ${esc(exercise.name)}
+        </strong>
+      </p>
+    `,
+    {
+      submit: "Fechar"
+    }
+  );
+
+  modal.querySelector(
+    ".modal-footer"
+  ).innerHTML = `
+    <button
+      type="button"
+      class="primary-button"
+      data-action="close-modal"
+    >
+      Fechar
+    </button>
+  `;
+}
+
+/* =========================================================
+   CONFIGURAÇÃO DE HIDRATAÇÃO
+   ========================================================= */
+
+function configHidratacao() {
+
+  openModal(
+    "Meta de hidratação",
+
+    field(
+      "Meta diária (ml)",
+      "goal",
+      "number",
+      state.settings.hydrationGoal,
+      "min=\"1\" required"
+    ) +
+
+    field(
+      "Quantidade por período (ml)",
+      "amount",
+      "number",
+      state.settings.hydrationPeriodAmount,
+      "min=\"1\" required"
+    ) +
+
+    field(
+      "Intervalo entre períodos (horas)",
+      "interval",
+      "number",
+      state.settings.hydrationInterval,
+      "min=\"1\" step=\"0.5\" required"
+    ),
+
+    {
+      submit: "Salvar meta"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    state.settings.hydrationGoal =
+      Number(f.get("goal"));
+
+    state.settings.hydrationPeriodAmount =
+      Number(f.get("amount"));
+
+    state.settings.hydrationInterval =
+      Number(f.get("interval"));
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Meta de hidratação atualizada."
+    );
+  };
+}
+
+/* =========================================================
+   META DE CALORIAS
+   ========================================================= */
+
+function configCalorias() {
+
+  openModal(
+    "Meta diária de calorias",
+
+    field(
+      "Calorias por dia",
+      "goal",
+      "number",
+      state.settings.calorieGoal,
+      "min=\"1\" required"
+    ),
+
+    {
+      submit: "Salvar meta"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    state.settings.calorieGoal =
+      Number(f.get("goal"));
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Meta de calorias atualizada."
+    );
+  };
+}
+
+/* =========================================================
+   TETOS DE FINANÇAS
+   ========================================================= */
+
+function configFinanceLimits() {
+
+  const categories =
+    new Set();
+
+  state.data.financas.forEach(x => {
+    if (x.category) {
+      categories.add(
+        x.category
+      );
+    }
+  });
+
+  Object.keys(
+    state.settings.financeLimits || {}
+  ).forEach(cat =>
+    categories.add(cat)
+  );
+
+  const list =
+    [...categories];
+
+  openModal(
+    "Tetos mensais por categoria",
+
+    `
+      ${
+        list.length
+          ? list.map(cat => `
+              ${field(
+                cat,
+                `limit-${encodeURIComponent(cat)}`,
+                "number",
+                state.settings
+                  .financeLimits?.[cat] || 0,
+                'min="0" step="0.01"'
+              )}
+            `).join("")
+          : `
+            <p class="muted">
+              Cadastre primeiro um gasto com uma categoria.
+            </p>
+          `
+      }
+
+      ${field(
+        "Nova categoria",
+        "newCategory"
+      )}
+
+      ${field(
+        "Teto da nova categoria",
+        "newLimit",
+        "number",
+        "",
+        'min="0" step="0.01"'
+      )}
+    `,
+
+    {
+      submit: "Salvar tetos"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const limits = {
+      ...(state.settings.financeLimits || {})
+    };
+
+    list.forEach(cat => {
+
+      const value =
+        Number(
+          f.get(
+            `limit-${encodeURIComponent(cat)}`
+          ) || 0
+        );
+
+      limits[cat] = value;
+
+    });
+
+    const newCategory =
+      String(
+        f.get("newCategory") || ""
+      ).trim();
+
+    const newLimit =
+      Number(
+        f.get("newLimit") || 0
+      );
+
+    if (newCategory) {
+      limits[newCategory] =
+        newLimit;
+    }
+
+    state.settings.financeLimits =
+      limits;
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Tetos de gastos atualizados."
+    );
+  };
+}
+
+/* =========================================================
+   OBJETIVO
+   ========================================================= */
+
+function openGoalForm(existing = null) {
+
+  openModal(
+    existing
+      ? "Editar objetivo"
+      : "Novo objetivo",
+
+    field(
+      "Objetivo",
+      "title",
+      "text",
+      existing?.title || "",
+      "required"
+    ) +
+
+    field(
+      "Prazo",
+      "deadline",
+      "date",
+      existing?.deadline || ""
+    ) +
+
+    field(
+      "Progresso (%)",
+      "progress",
+      "number",
+      existing?.progress || 0,
+      'min="0" max="100"'
+    ) +
+
+    field(
+      "Dinheiro necessário",
+      "moneyGoal",
+      "number",
+      existing?.moneyGoal || 0,
+      'min="0" step="0.01"'
+    ) +
+
+    textareaField(
+      "Observações",
+      "observations",
+      existing?.observations || ""
+    ),
+
+    {
+      submit:
+        existing
+          ? "Salvar"
+          : "Criar objetivo"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const goal = {
+      id:
+        existing?.id ||
+        uid("o"),
+
+      title:
+        f.get("title"),
+
+      deadline:
+        f.get("deadline"),
+
+      progress:
+        Number(
+          f.get("progress") || 0
+        ),
+
+      moneyGoal:
+        Number(
+          f.get("moneyGoal") || 0
+        ),
+
+      observations:
+        f.get("observations"),
+
+      metas:
+        existing?.metas || []
+    };
+
+    if (existing) {
+
+      const index =
+        state.data.objetivos
+          .findIndex(
+            x => x.id === existing.id
+          );
+
+      if (index >= 0) {
+        state.data.objetivos[index] =
+          goal;
+      }
+
+    } else {
+
+      state.data.objetivos.push(
+        goal
+      );
+
+    }
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      existing
+        ? "Objetivo atualizado."
+        : "Objetivo criado."
+    );
+  };
+}
+
+/* =========================================================
+   META INTERNA DO OBJETIVO
+   ========================================================= */
+
+function addMeta(goalId) {
+
+  openModal(
+    "Nova meta do objetivo",
+
+    field(
+      "Meta",
+      "title",
+      "text",
+      "",
+      "required"
+    ) +
+
+    selectField(
+      "Periodicidade",
+      "period",
+      [
+        "Diária",
+        "Semanal",
+        "Mensal"
+      ],
+      "Diária"
+    ),
+
+    {
+      submit: "Adicionar meta"
+    }
+  );
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    const goal =
+      state.data.objetivos.find(
+        x => x.id === goalId
+      );
+
+    if (!goal) return;
+
+    if (!goal.metas) {
+      goal.metas = [];
+    }
+
+    goal.metas.push({
+      id: uid("meta"),
+      title:
+        f.get("title"),
+      period:
+        f.get("period"),
+      done: false
+    });
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Meta adicionada ao objetivo."
+    );
+  };
+}
+
+/* =========================================================
+   EDIÇÃO DE COMPROMISSO E TAREFA
+   ========================================================= */
+
+function editItem(type, id) {
+
+  const key =
+    type === "compromisso"
+      ? "compromissos"
+      : "tarefas";
+
+  const item =
+    state.data[key].find(
+      x => x.id === id
+    );
+
+  if (!item) return;
+
+  if (type === "compromisso") {
+
+    openModal(
+      "Editar compromisso",
+
+      field(
+        "Título",
+        "title",
+        "text",
+        item.title,
+        "required"
+      ) +
+
+      field(
+        "Data",
+        "date",
+        "date",
+        item.date,
+        "required"
+      ) +
+
+      field(
+        "Horário",
+        "time",
+        "time",
+        item.time || ""
+      ) +
+
+      field(
+        "Local",
+        "location",
+        "text",
+        item.location || ""
+      ),
+
+      {
+        submit: "Salvar"
+      }
+    );
+
+  } else {
+
+    openModal(
+      "Editar tarefa",
+
+      field(
+        "Tarefa",
+        "title",
+        "text",
+        item.title,
+        "required"
+      ) +
+
+      selectField(
+        "Prioridade",
+        "priority",
+        [
+          "Baixa",
+          "Normal",
+          "Média",
+          "Alta"
+        ],
+        item.priority ||
+          "Normal"
+      ) +
+
+      field(
+        "Data",
+        "date",
+        "date",
+        item.date || ""
+      ) +
+
+      field(
+        "Horário",
+        "time",
+        "time",
+        item.time || ""
+      ),
+
+      {
+        submit: "Salvar"
+      }
+    );
+  }
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    const f =
+      new FormData(e.target);
+
+    Object.assign(
+      item,
+      Object.fromEntries(
+        f.entries()
+      )
+    );
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Alterações salvas."
+    );
+  };
+}
+
+/* =========================================================
+   FOTO DE PERFIL
+   ========================================================= */
+
+function profilePhoto() {
+
+  openModal(
+    "Foto de perfil",
+
+    `
+      ${
+        state.user.photo
+          ? `
+            <div class="photo-preview">
+              <img
+                class="profile-photo-preview"
+                src="${esc(
+                  state.user.photo
+                )}"
+                alt="Foto atual"
+              >
+            </div>
+          `
+          : `
+            <div class="photo-preview">
+              <div class="profile-photo-placeholder">
+                📷
+              </div>
+            </div>
+          `
+      }
+
+      <label class="form-field">
+
+        <span>
+          Escolher foto
+        </span>
+
+        <input
+          id="profile-photo-input"
+          type="file"
+          accept="image/*"
+        >
+
+      </label>
+
+      <button
+        type="button"
+        class="ghost-button"
+        id="remove-profile-photo"
+      >
+        🗑 Excluir foto atual
+      </button>
+    `,
+
+    {
+      submit: "Salvar foto"
+    }
+  );
+
+  let selectedPhoto =
+    state.user.photo || "";
+
+  const input =
+    modal.querySelector(
+      "#profile-photo-input"
+    );
+
+  input.onchange = event => {
+
+    const file =
+      event.target.files?.[0];
+
+    if (!file) return;
+
+    const reader =
+      new FileReader();
+
+    reader.onload = () => {
+      selectedPhoto =
+        reader.result;
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  modal.querySelector(
+    "#remove-profile-photo"
+  ).onclick = () => {
+
+    selectedPhoto = "";
+
+    state.user.photo = "";
+
+    saveState();
+
+    closeModal();
+    render();
+
+    toast(
+      "Foto de perfil excluída."
+    );
+  };
+
+  modal.querySelector(
+    "#lidire-form"
+  ).onsubmit = e => {
+
+    e.preventDefault();
+
+    if (!selectedPhoto) {
+      toast(
+        "Selecione uma foto.",
+        "error"
+      );
+      return;
+    }
+
+    state.user.photo =
+      selectedPhoto;
+
+    saveState();
+    closeModal();
+    render();
+
+    toast(
+      "Foto de perfil atualizada."
+    );
+  };
+}
+
+/* =========================================================
+   AÇÕES PRINCIPAIS
+   ========================================================= */
+
+function removeItem(
+  key,
+  id,
+  message = "Item removido."
+) {
+
+  state.data[key] =
+    state.data[key].filter(
+      x => x.id !== id
+    );
+
+  saveState();
+  render();
+
+  toast(message);
+}
+
+function handleAction(
+  action,
+  el
+) {
+
+  /* QUICK ADD */
+
+  if (action === "quick-add") {
+
+    openModal(
+      "O que você quer adicionar?",
+
+      `
+        <div class="quick-actions">
+
+          ${[
+            ["compromissos", "▣", "Compromisso"],
+            ["tarefas", "✓", "Tarefa"],
+            ["compras", "🛒", "Lista de compras"],
+            ["estudos", "▤", "Estudo"],
+            ["treinos", "♢", "Treino"],
+            ["hidratacao", "◉", "Água"],
+            ["alimentacao", "🍽", "Refeição"],
+            ["financas", "R$", "Finança"],
+            ["objetivos", "◎", "Objetivo"],
+            ["familia", "♧", "Pessoa"]
+          ]
+            .map(
+              x => `
+                <button
+                  type="button"
+                  class="quick-option"
+                  data-action="quick-option"
+                  data-key="${x[0]}"
+                >
+                  <span>${x[1]}</span>
+                  ${x[2]}
+                </button>
+              `
+            )
+            .join("")}
+
+        </div>
+      `,
+
+      {
+        submit: "Fechar"
+      }
+    );
+
+    modal.querySelector(
+      ".modal-footer"
+    ).style.display = "none";
+
+    return;
+  }
+
+  if (action === "quick-option") {
+
+    const key =
+      el.dataset.key;
+
+    closeModal();
+    addForm(key);
+
+    return;
+  }
+
+  if (action === "close-modal") {
+    closeModal();
+    return;
+  }
+
+  if (
+    action.startsWith("add-") &&
+    action !== "add-item-compra"
+  ) {
+
+    addForm(
+      action.slice(4)
+    );
+
+    return;
+  }
+
+  /* COMPRAS */
+
+  if (action === "open-lista-compras") {
+
+    currentPage = "compras";
+
+    currentShoppingList =
+      el.dataset.id;
+
+    render();
+
+    return;
+  }
+
+  if (action === "back-compras") {
+
+    currentPage = "compras";
+    currentShoppingList = null;
+
+    render();
+
+    return;
+  }
+
+  if (action === "delete-lista-compras") {
+
+    const id =
+      el.dataset.id;
+
+    if (
+      !confirm(
+        "Excluir esta lista de compras?"
+      )
+    ) {
+      return;
+    }
+
+    state.data.compras =
+      state.data.compras.filter(
+        x => x.id !== id
+      );
+
+    saveState();
+
+    render();
+
+    toast(
+      "Lista excluída."
+    );
+
+    return;
+  }
+
+  if (action === "add-item-compra") {
+
+    const listId =
+      el.dataset.id;
+
+    const lista =
+      state.data.compras.find(
+        x => x.id === listId
+      );
+
+    if (!lista) return;
+
+    openModal(
+      "Adicionar item",
+
+      field(
+        "Item",
+        "name",
+        "text",
+        "",
+        "required"
+      ) +
+
+      field(
+        "Quantidade",
+        "quantity"
+      ) +
+
+      field(
+        "Categoria",
+        "category"
+      ),
+
+      {
+        submit: "Adicionar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      lista.items =
+        lista.items || [];
+
+      lista.items.push({
+        id: uid("item"),
+        name:
+          f.get("name"),
+        quantity:
+          f.get("quantity"),
+        category:
+          f.get("category"),
+        done: false
+      });
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Item adicionado."
+      );
+    };
+
+    return;
+  }
+
+  if (action === "toggle-item-compra") {
+
+    const lista =
+      state.data.compras.find(
+        x =>
+          x.id ===
+          el.dataset.listId
+      );
+
+    if (!lista) return;
+
+    const item =
+      (lista.items || []).find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (!item) return;
+
+    item.done = !item.done;
+
+    saveState();
+    render();
+
+    return;
+  }
+
+  if (action === "delete-item-compra") {
+
+    const lista =
+      state.data.compras.find(
+        x =>
+          x.id ===
+          el.dataset.listId
+      );
+
+    if (!lista) return;
+
+    lista.items =
+      (lista.items || []).filter(
+        x =>
+          x.id !==
+          el.dataset.id
+      );
+
+    saveState();
+    render();
+
+    toast(
+      "Item removido."
+    );
+
+    return;
+  }
+
+  if (
+    action ===
+    "lista-dieta-para-compras"
+  ) {
+
+    const lista =
+      state.data.compras.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    const diet =
+      state.settings.diet;
+
+    if (!lista || !diet?.foods?.length) {
+
+      toast(
+        "Cadastre a dieta primeiro.",
+        "error"
+      );
+
+      return;
+    }
+
+    diet.foods.forEach(food => {
+
+      const exists =
+        (lista.items || [])
+          .some(
+            item =>
+              item.name
+                .toLowerCase() ===
+              food.name
+                .toLowerCase()
+          );
+
+      if (!exists) {
+
+        lista.items =
+          lista.items || [];
+
+        lista.items.push({
+          id: uid("item"),
+          name: food.name,
+          quantity:
+            food.quantity || "",
+          category: "Dieta",
+          done: false
+        });
+      }
+
+    });
+
+    saveState();
+    render();
+
+    toast(
+      "Alimentos da dieta adicionados à lista."
+    );
+
+    return;
+  }
+
+  /* TAREFAS */
+
+  if (action === "toggle-tarefa") {
+
+    const item =
+      state.data.tarefas.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (item) {
+      item.done = !item.done;
+    }
+
+    saveState();
+    render();
+
+    return;
+  }
+
+  if (action === "edit-tarefa") {
+
+    editItem(
+      "tarefa",
+      el.dataset.id
+    );
+
+    return;
+  }
+
+  if (action === "edit-compromisso") {
+
+    editItem(
+      "compromisso",
+      el.dataset.id
+    );
+
+    return;
+  }
+
+  /* ESTUDOS */
+
+  if (action === "toggle-estudo") {
+
+    const item =
+      state.data.estudos.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (item) {
+      item.done = !item.done;
+    }
+
+    saveState();
+    render();
+
+    return;
+  }
+
+  if (action === "edit-estudo") {
+
+    const item =
+      state.data.estudos.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (!item) return;
+
+    openModal(
+      "Editar estudo",
+
+      field(
+        "Matéria",
+        "subject",
+        "text",
+        item.subject,
+        "required"
+      ) +
+
+      field(
+        "Assunto",
+        "topic",
+        "text",
+        item.topic || ""
+      ) +
+
+      field(
+        "Duração (min)",
+        "duration",
+        "number",
+        item.duration || ""
+      ) +
+
+      textareaField(
+        "Bloco de anotações",
+        "notes",
+        item.notes || "",
+        'class="notes-box"'
+      ) +
+
+      field(
+        "Link da bibliografia",
+        "link",
+        "url",
+        item.link || ""
+      ),
+
+      {
+        submit: "Salvar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      Object.assign(
+        item,
+        {
+          subject:
+            f.get("subject"),
+          topic:
+            f.get("topic"),
+          duration:
+            f.get("duration"),
+          notes:
+            f.get("notes"),
+          link:
+            f.get("link")
+        }
+      );
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Estudo atualizado."
+      );
+    };
+
+    return;
+  }
+
+  /* TREINOS */
+
+  if (action === "add-exercicio") {
+
+    addExerciseForm(
+      el.dataset.id
+    );
+
+    return;
+  }
+
+  if (action === "animate-exercicio") {
+
+    animateExercise(
+      el.dataset.id
+    );
+
+    return;
+  }
+
+  if (action === "edit-exercicio") {
+
+    const treino =
+      state.data.treinos.find(
+        x =>
+          x.id ===
+          el.dataset.treinoId
+      );
+
+    const exercise =
+      treino?.exercises?.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (treino && exercise) {
+      addExerciseForm(
+        treino.id,
+        exercise
+      );
+    }
+
+    return;
+  }
+
+  if (action === "delete-exercicio") {
+
+    const treino =
+      state.data.treinos.find(
+        x =>
+          x.id ===
+          el.dataset.treinoId
+      );
+
+    if (!treino) return;
+
+    treino.exercises =
+      (treino.exercises || [])
+        .filter(
+          x =>
+            x.id !==
+            el.dataset.id
+        );
+
+    saveState();
+    render();
+
+    toast(
+      "Exercício removido."
+    );
+
+    return;
+  }
+
+  /* HIDRATAÇÃO */
+
+  if (action === "quick-water") {
+
+    state.data.hidratacao.push({
+      id: uid("h"),
+      amount:
+        Number(
+          el.dataset.value
+        ),
+      date:
+        todayISO(),
+      createdAt:
+        new Date().toISOString()
+    });
+
+    saveState();
+    render();
+
+    toast(
+      `+${el.dataset.value} ml registrados.`
+    );
+
+    return;
+  }
+
+  if (action === "config-hidratacao") {
+
+    configHidratacao();
+    return;
+  }
+
+  if (action === "reset-hidratacao") {
+
+    if (
+      confirm(
+        "Limpar todos os registros de hidratação?"
+      )
+    ) {
+
+      state.data.hidratacao =
+        state.data.hidratacao.filter(
+          x =>
+            x.date !==
+            todayISO()
+        );
+
+      saveState();
+      render();
+
+      toast(
+        "Registros de hoje limpos."
+      );
+    }
+
+    return;
+  }
+
+  /* ALIMENTAÇÃO */
+
+  if (action === "add-alimentacao") {
+
+    addMealForm();
+    return;
+  }
+
+  if (action === "edit-refeicao") {
+
+    const meal =
+      state.data.alimentacao.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (meal) {
+      addMealForm(meal);
+    }
+
+    return;
+  }
+
+  if (action === "delete-refeicao") {
+
+    removeItem(
+      "alimentacao",
+      el.dataset.id,
+      "Refeição removida."
+    );
+
+    return;
+  }
+
+  if (action === "config-calorias") {
+
+    configCalorias();
+    return;
+  }
+
+  if (action === "add-dieta") {
+
+    addDietForm();
+    return;
+  }
+
+  if (action === "dieta-para-compras") {
+
+    createShoppingListFromDiet();
+    return;
+  }
+
+  /* FINANÇAS */
+
+  if (action === "config-tetos") {
+
+    configFinanceLimits();
+    return;
+  }
+
+  /* OBJETIVOS */
+
+  if (action === "add-meta") {
+
+    addMeta(
+      el.dataset.id
+    );
+
+    return;
+  }
+
+  if (action === "toggle-meta") {
+
+    const goal =
+      state.data.objetivos.find(
+        x =>
+          x.id ===
+          el.dataset.goalId
+      );
+
+    if (!goal) return;
+
+    const meta =
+      (goal.metas || []).find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (!meta) return;
+
+    meta.done =
+      !meta.done;
+
+    saveState();
+    render();
+
+    return;
+  }
+
+  if (action === "progress-objetivo") {
+
+    const item =
+      state.data.objetivos.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (!item) return;
+
+    openModal(
+      "Atualizar progresso",
+
+      field(
+        "Progresso (%)",
+        "progress",
+        "number",
+        item.progress || 0,
+        'min="0" max="100" required'
+      ),
+
+      {
+        submit: "Atualizar"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      item.progress =
+        Number(
+          f.get("progress")
+        );
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Progresso atualizado."
+      );
+    };
+
+    return;
+  }
+
+  if (action === "edit-objetivo") {
+
+    const item =
+      state.data.objetivos.find(
+        x =>
+          x.id ===
+          el.dataset.id
+      );
+
+    if (item) {
+      openGoalForm(item);
+    }
+
+    return;
+  }
+
+  /* ASSISTENTE */
+
+  if (
+    action ===
+    "assistant-question"
+  ) {
+
+    const q =
+      el.dataset.question;
+
+    let response = "";
+
+    if (
+      q.includes("hoje")
+    ) {
+
+      response =
+        `Hoje você tem ${
+          state.data.compromissos.filter(
+            x =>
+              x.date ===
+              todayISO()
+          ).length
+        } compromisso(s) e ${
+          state.data.tarefas.filter(
+            x => !x.done
+          ).length
+        } tarefa(s) pendente(s).`;
+
+    } else if (
+      q.includes("pendentes")
+    ) {
+
+      response =
+        `Você tem ${
+          state.data.tarefas
+            .filter(
+              x => !x.done
+            )
+            .map(
+              x => x.title
+            )
+            .join(", ") ||
+          "nenhuma tarefa pendente"
+        }.`;
+
+    } else {
+
+      response =
+        `Sua rotina possui ${
+          state.data.tarefas.filter(
+            x => !x.done
+          ).length
+        } tarefa(s) pendente(s), ${
+          state.data.objetivos.length
+        } objetivo(s), ${
+          state.data.compras.reduce(
+            (total, lista) =>
+              total +
+              (lista.items || [])
+                .filter(
+                  item =>
+                    !item.done
+                ).length,
+            0
+          )
+        } item(ns) de compras pendentes e ${
+          state.data.alimentacao.filter(
+            x =>
+              x.date ===
+              todayISO()
+          ).length
+        } refeição(ões) registradas hoje.`;
+    }
+
+    const box =
+      document.getElementById(
+        "assistant-response"
+      );
+
+    if (box) {
+
+      box.innerHTML = `
+        <strong>
+          LiDire
+        </strong>
+
+        <p>
+          ${esc(response)}
+        </p>
+      `;
+    }
+
+    return;
+  }
+
+  /* PERFIL */
+
+  if (
+    action ===
+    "edit-profile"
+  ) {
+
+    openModal(
+      "Editar perfil",
+
+      field(
+        "Nome",
+        "name",
+        "text",
+        state.user.name,
+        "required"
+      ) +
+
+      field(
+        "E-mail",
+        "email",
+        "email",
+        state.user.email || ""
+      ) +
+
+      field(
+        "Idade",
+        "age",
+        "number",
+        state.user.age || ""
+      ) +
+
+      field(
+        "Telefone",
+        "phone",
+        "tel",
+        state.user.phone || ""
+      ),
+
+      {
+        submit: "Salvar perfil"
+      }
+    );
+
+    modal.querySelector(
+      "#lidire-form"
+    ).onsubmit = e => {
+
+      e.preventDefault();
+
+      const f =
+        new FormData(e.target);
+
+      state.user = {
+        ...state.user,
+        ...Object.fromEntries(
+          f.entries()
+        )
+      };
+
+      saveState();
+      closeModal();
+      render();
+
+      toast(
+        "Perfil atualizado."
+      );
+    };
+
+    return;
+  }
+
+  if (
+    action ===
+    "photo-profile"
+  ) {
+
+    profilePhoto();
+    return;
+  }
+
+  /* EXCLUSÕES */
+
+  const deletes = {
+    "delete-compromisso": [
+      "compromissos",
+      "Compromisso removido."
+    ],
+
+    "delete-tarefa": [
+      "tarefas",
+      "Tarefa removida."
+    ],
+
+    "delete-estudo": [
+      "estudos",
+      "Registro removido."
+    ],
+
+    "delete-treino": [
+      "treinos",
+      "Treino removido."
+    ],
+
+    "delete-hidratacao": [
+      "hidratacao",
+      "Registro removido."
+    ],
+
+    "delete-financa": [
+      "financas",
+      "Lançamento removido."
+    ],
+
+    "delete-objetivo": [
+      "objetivos",
+      "Objetivo removido."
+    ],
+
+    "delete-familia": [
+      "familia",
+      "Pessoa removida."
+    ]
+  };
+
+  if (deletes[action]) {
+
+    removeItem(
+      deletes[action][0],
+      el.dataset.id,
+      deletes[action][1]
+    );
+
+    return;
+  }
+
+  /* RESET */
+
+  if (
+    action ===
+    "clear-local"
+  ) {
+
+    if (
+      confirm(
+        "Isso apagará os dados salvos neste dispositivo. Continuar?"
+      )
+    ) {
+
+      state =
+        clone(defaultState);
+
+      saveState();
+
+      currentPage =
+        "inicio";
+
+      currentShoppingList =
+        null;
+
+      render();
+
+      toast(
+        "Dados locais redefinidos."
+      );
+    }
+  }
+}
+
+/* =========================================================
+   EVENTOS
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+  event => {
+
+    const pageEl =
+      event.target.closest(
+        "[data-page]"
+      );
+
+    if (pageEl) {
+
+      event.preventDefault();
+
+      currentPage =
+        pageEl.dataset.page;
+
+      currentShoppingList =
+        null;
+
+      render();
+
+      return;
+    }
+
+    const actionEl =
+      event.target.closest(
+        "[data-action]"
+      );
+
+    if (actionEl) {
+
+      event.preventDefault();
+
+      handleAction(
+        actionEl.dataset.action,
+        actionEl
+      );
+    }
+  }
+);
+
+document.addEventListener(
+  "click",
+  event => {
+
+    if (
+      event.target.classList.contains(
+        "modal-backdrop"
+      )
+    ) {
+      closeModal();
+    }
+  }
+);
+
+/* =========================================================
+   API PÚBLICA DA LIDIRE
+   ========================================================= */
+
+window.LiDire = {
+
+  state: () => state,
+
+  save: saveState,
+
+  go: page => {
+
+    currentPage =
+      page;
+
+    currentShoppingList =
+      null;
+
+    render();
+  },
+
+  reset: () => {
+
+    if (
+      confirm(
+        "Redefinir todos os dados da LiDire?"
+      )
+    ) {
+
+      state =
+        clone(defaultState);
+
+      saveState();
+
+      currentPage =
+        "inicio";
+
+      render();
+    }
+  }
+
+};
+
+/* =========================================================
+   INICIALIZAÇÃO
+   ========================================================= */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    injectLiDireStyles();
+
+    render();
+
+  }
+);
